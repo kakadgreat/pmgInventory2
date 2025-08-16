@@ -13,11 +13,14 @@
 
 <main class="container">
   <section class="pill">
+    <!-- Team chips -->
+    <div id="chips_manage" class="chips"></div>
+
     <div class="row" style="justify-content:space-between;gap:.5rem;flex-wrap:wrap">
       <div class="row">
         <input id="q" type="search" placeholder="Search name / ext / email" />
         <select id="loc"><option value="">All locations</option></select>
-        <select id="team"><option value="">All teams</option></select>
+        <select id="team_manage"><option value="">All teams</option></select>
         <select id="stat"><option value="">Any status</option><option>Active</option><option>Inactive</option></select>
       </div>
       <div class="row">
@@ -35,9 +38,14 @@
 </main>
 
 <script>
-async function loadCfg(){ try{ const r=await fetch('/.netlify/functions/config'); if(r.ok) return await r.json(); }catch{} return {locations:[],teams:[]}; }
+const FALLBACK_LOCATIONS = ["Jasper Primary Care","Jasper Pediatrics","Jasper MedSpa","Roswell Primary Care","Roswell MedSpa","Canton Primary Care","Canton Pediatrics","Canton MedSpa","Rome Primary Care","Rome MedSpa"];
+const FALLBACK_TEAMS = ["PROVIDERS","FRONT OFFICE","BILLING","ADMINISTRATION","MA","PEDIATRICS","SPA","CALL CENTER","IT","LEADERSHIP"];
+
+async function loadCfg(){ try{ const r=await fetch('/.netlify/functions/config'); if(r.ok) return await r.json(); }catch{} return {locations:FALLBACK_LOCATIONS, teams:FALLBACK_TEAMS}; }
 async function loadDir(){ const r=await fetch('/.netlify/functions/directory',{cache:'no-store'}); return r.ok?await r.json():[]; }
 function setOpts(sel, arr, label){ sel.innerHTML=label?`<option value="">${label}</option>`:''; [...new Set(arr.filter(Boolean))].sort().forEach(v=>sel.insertAdjacentHTML('beforeend', `<option>${v}</option>`)); }
+function tokenizeTeams(s){ return String(s||'').split(',').map(t=>t.trim()).filter(Boolean); }
+function buildChips(mountId, values, onChange){ const m=document.getElementById(mountId); if(!m) return ()=>[]; const sel=new Set(); const render=()=>{m.innerHTML=''; values.forEach(v=>{ const a=document.createElement('span'); a.className='chip'+(sel.has(v)?' active':''); a.textContent=v; a.onclick=()=>{sel.has(v)?sel.delete(v):sel.add(v); render(); onChange([...sel]);}; m.appendChild(a);});}; render(); return ()=>[...sel]; }
 
 function rowHtml(x, cfg){
   const teams = (cfg.teams||[]).map(t=>`<option ${((x.team||'').toLowerCase().includes(t.toLowerCase()))?'selected':''}>${t}</option>`).join('');
@@ -77,29 +85,43 @@ function rowHtml(x, cfg){
   const cfg = await loadCfg();
   let data = await loadDir();
 
-  const q=document.getElementById('q'), locSel=document.getElementById('loc'), teamSel=document.getElementById('team'), statSel=document.getElementById('stat');
-  setOpts(locSel, cfg.locations.length?cfg.locations:data.map(x=>x.location), 'All locations');
-  setOpts(teamSel, cfg.teams.length?cfg.teams:[], 'All teams');
+  // filters
+  const q=document.getElementById('q'), locSel=document.getElementById('loc'), teamSel=document.getElementById('team_manage'), statSel=document.getElementById('stat');
+  setOpts(locSel, cfg.locations.length?cfg.locations:FALLBACK_LOCATIONS, 'All locations');
+  setOpts(teamSel, cfg.teams.length?cfg.teams:FALLBACK_TEAMS, 'All teams');
 
-  const render = () => {
+  const getChipTeams = buildChips('chips_manage', (cfg.teams.length?cfg.teams:FALLBACK_TEAMS), render);
+
+  const table = document.getElementById('table');
+  function render(){
     const text=(q.value||'').toLowerCase(), loc=locSel.value||'', team=teamSel.value||'', stat=statSel.value||'';
+    const chipSet = new Set(getChipTeams());
+
     let list = data;
+    // chip filter (multi-select)
+    if (chipSet.size){
+      list = list.filter(x=>{
+        const toks = tokenizeTeams(x.team).map(z=>z.toLowerCase());
+        for (const t of chipSet) if (toks.includes(t.toLowerCase())) return true;
+        return false;
+      });
+    }
     if (loc)  list = list.filter(x => (x.location||'') === loc);
-    if (team) list = list.filter(x => (x.team||'').toLowerCase().split(',').map(s=>s.trim()).includes(team.toLowerCase()));
+    if (team) list = list.filter(x => tokenizeTeams(x.team).map(z=>z.toLowerCase()).includes(team.toLowerCase()));
     if (stat) list = list.filter(x => (x.status||'').toLowerCase() === stat.toLowerCase());
     if (text) list = list.filter(x => (`${x.name} ${x.extension} ${x.email} ${x.direct_phone}`.toLowerCase().includes(text)));
-    const html = list.map(x => rowHtml(x, cfg)).join('');
-    const mount = document.getElementById('table');
-    mount.innerHTML = html || '<div class="small">No results.</div>';
 
-    mount.querySelectorAll('[data-edit]').forEach(btn => {
+    table.innerHTML = list.map(x => rowHtml(x, cfg)).join('') || '<div class="small">No results.</div>';
+
+    // wire edit + delete
+    table.querySelectorAll('[data-edit]').forEach(btn => {
       btn.onclick = () => {
         const id = 'form-' + btn.dataset.edit;
         const f = document.getElementById(id);
         f.style.display = (f.style.display==='none'||!f.style.display) ? 'grid' : 'none';
       };
     });
-    mount.querySelectorAll('form.edit').forEach(f => {
+    table.querySelectorAll('form.edit').forEach(f => {
       f.onsubmit = async (e) => {
         e.preventDefault();
         const o = Object.fromEntries(new FormData(f).entries());
@@ -108,14 +130,14 @@ function rowHtml(x, cfg){
         data = await loadDir(); render();
       };
     });
-    mount.querySelectorAll('[data-del]').forEach(btn => {
+    table.querySelectorAll('[data-del]').forEach(btn => {
       btn.onclick = async () => {
         if (!confirm('Delete this entry?')) return;
         await fetch('/.netlify/functions/directory?slug='+encodeURIComponent(btn.dataset.del), { method:'DELETE' });
         data = await loadDir(); render();
       };
     });
-  };
+  }
 
   [q,locSel,teamSel,statSel].forEach(el=>el.addEventListener('input', render));
   locSel.addEventListener('change', render); teamSel.addEventListener('change', render); statSel.addEventListener('change', render);
