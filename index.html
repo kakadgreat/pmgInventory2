@@ -1,31 +1,44 @@
 <!doctype html><html lang="en"><head>
 <meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>Company Inventory</title><link rel="stylesheet" href="style.css"/></head><body>
-
-  <header id="topbar" class="topbar">
-    <div class="topbar-inner">
-      <button class="hamburger" id="hamburger" aria-label="Toggle menu" aria-expanded="false">☰</button>
-      <nav id="nav" class="nav">
-        <a href="index.html">Home</a>
-        <a href="list.html">List</a>
-        <a href="locations.html">Locations</a>
-        <a href="assets/inventory.json">Data (JSON)</a>
-        <a href="readme.html">README</a>
-      </nav>
-    </div>
-  </header>
+<header id="topbar" class="topbar">
+  <div class="topbar-inner">
+    <button class="hamburger" id="hamburger" aria-label="Toggle menu" aria-expanded="false">☰</button>
+    <nav id="nav" class="nav">
+      <a href="index.html">Home</a>
+      <a href="list.html">List</a>
+      <a href="locations.html">Locations</a>
+      <a href="assets/inventory.json">Data (JSON)</a>
+      <a href="readme.html">README</a>
+    </nav>
+  </div>
+</header>
 
 <main class="container">
+  <!-- NEW: Quick actions with Add Item -->
+  <section class="pill">
+    <h2>Quick actions</h2>
+    <p class="small">Add or manage items right from here.</p>
+    <div class="row">
+      <a class="btn primary" href="admin/add.html">Add Item</a>
+      <a class="btn" href="admin/">Admin</a>
+      <a class="btn" href="admin/config.html">Config</a>
+    </div>
+  </section>
+
   <section class="pill">
     <h1>Inventory Overview</h1>
     <p class="small">Data parsed from <em>Computer Inventory 2025 Ankur.xlsx</em>. Click a category to view details.</p>
     <div class="row" id="categoryList"></div>
   </section>
+
   <section class="pill">
     <h2>Recently Parsed Items</h2>
     <div class="grid" id="recent"></div>
   </section>
+
   <footer>Static site — you can move data into Netlify DB or Blobs later for editing from the web.</footer>
 </main>
+
 <script src="script.js"></script><script>initIndex();</script>
 </body></html>
