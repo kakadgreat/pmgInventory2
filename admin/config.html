@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Config</title>
+<link rel="stylesheet" href="../style.css"/>
+</head>
+<body>
+<header class="topbar"><div class="topbar-inner">
+  <a class="btn" href="../index.html">← Home</a>
+  <a class="btn" href="./">Admin</a>
+  <strong style="margin-left:.5rem">Config</strong>
+</div></header>
+
+<main class="container">
+  <section class="pill">
+    <h1>Manage Categories & Locations</h1>
+    <p class="small">One per line. Save writes to Netlify Blobs, used everywhere.</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div>
+        <h3>Categories</h3>
+        <textarea id="cats" style="width:100%;height:240px"></textarea>
+      </div>
+      <div>
+        <h3>Locations</h3>
+        <textarea id="locs" style="width:100%;height:240px"></textarea>
+      </div>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button class="btn primary" id="save">Save</button>
+      <span id="msg" class="small"></span>
+    </div>
+  </section>
+</main>
+
+<script>
+async function loadCfg(){
+  try { const r = await fetch('/.netlify/functions/config'); if (r.ok) return await r.json(); } catch {}
+  return (await (await fetch('../assets/config.json')).json());
+}
+(async () => {
+  const cfg = await loadCfg();
+  document.getElementById('cats').value = (cfg.categories||[]).join('\n');
+  document.getElementById('locs').value = (cfg.locations||[]).join('\n');
+
+  document.getElementById('save').addEventListener('click', async () => {
+    const categories = document.getElementById('cats').value.split('\n').map(s=>s.trim()).filter(Boolean);
+    const locations  = document.getElementById('locs').value.split('\n').map(s=>s.trim()).filter(Boolean);
+    const r = await fetch('/.netlify/functions/config', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ categories, locations }) });
+    document.getElementById('msg').textContent = r.ok ? 'Saved!' : 'Error saving';
+  });
+})();
+</script>
+</body>
+</html>
