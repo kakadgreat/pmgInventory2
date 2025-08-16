@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Upload Phone Directory JSON</title>
+<link rel="stylesheet" href="../style.css"/>
+</head>
+<body>
+<header class="topbar"><div class="topbar-inner">
+  <a class="btn" href="../index.html">← Home</a>
+  <a class="btn" href="./">Admin</a>
+  <strong style="margin-left:.5rem">Phone Upload</strong>
+</div></header>
+
+<main class="container">
+  <section class="pill">
+    <div class="row">
+      <button id="sendSeed" class="btn primary">Send bundled seed (assets/phones_seed.json)</button>
+      <input type="file" id="file" accept="application/json"/>
+      <button id="sendFile" class="btn">Send selected file</button>
+    </div>
+    <pre id="out" class="small" style="margin-top:8px"></pre>
+  </section>
+</main>
+
+<script>
+async function postItems(items){
+  const r = await fetch('/.netlify/functions/directory', {
+    method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ items })
+  });
+  return r.text();
+}
+document.getElementById('sendSeed').onclick = async () => {
+  const r = await fetch('../assets/phones_seed.json'); const items = await r.json();
+  document.getElementById('out').textContent = await postItems(items);
+};
+document.getElementById('sendFile').onclick = async () => {
+  const f = document.getElementById('file').files[0]; if(!f){ alert('Pick a JSON file'); return; }
+  const text = await f.text(); const items = JSON.parse(text);
+  document.getElementById('out').textContent = await postItems(items);
+};
+</script>
+</body>
+</html>
