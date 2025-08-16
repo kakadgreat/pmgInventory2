@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Add Inventory Item</title>
+<link rel="stylesheet" href="../style.css"/>
+</head>
+<body>
+<header class="topbar"><div class="topbar-inner">
+  <a class="btn" href="../index.html">← Home</a>
+  <a class="btn" href="./">Admin</a>
+  <strong style="margin-left:.5rem">Add Item</strong>
+</div></header>
+<main class="container">
+  <section class="pill">
+    <form id="f" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px">
+      <input name="category" placeholder="Category (e.g., Laptops)" required>
+      <input name="title" placeholder="Title (e.g., MacBook Pro 14”)">
+      <input name="brand" placeholder="Brand">
+      <input name="model" placeholder="Model">
+      <input name="asset_tag" placeholder="Asset tag">
+      <input name="serial" placeholder="Serial">
+      <input name="user" placeholder="User">
+      <input name="email" placeholder="Email">
+      <input name="location" placeholder="Location (e.g., NYC)">
+      <input name="room" placeholder="Room">
+      <input name="dept" placeholder="Dept">
+      <input name="status" placeholder="Status (e.g., In use)">
+      <select name="warranty_status">
+        <option value="">Warranty Status</option>
+        <option>Active</option>
+        <option>Deactivated</option>
+      </select>
+      <input name="os" placeholder="OS">
+      <input name="cpu" placeholder="CPU">
+      <input name="ram" placeholder="RAM">
+      <input name="storage" placeholder="Storage">
+      <input name="purchase_date" placeholder="Purchase date (YYYY-MM-DD)">
+      <input name="warranty_expires" placeholder="Warranty expires (YYYY-MM-DD)">
+      <input name="notes" placeholder="Notes" style="grid-column:1/-1">
+      <button class="btn primary" type="submit" style="grid-column:1/-1">Save</button>
+    </form>
+    <pre id="out" class="small" style="margin-top:8px"></pre>
+  </section>
+</main>
+<script>
+const f = document.getElementById('f');
+const out = document.getElementById('out');
+f.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const x = Object.fromEntries(new FormData(f).entries());
+  // empty strings -> undefined
+  Object.keys(x).forEach(k => { if(x[k]==='') delete x[k]; });
+  const res = await fetch('/.netlify/functions/inventory', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ item: x })
+  });
+  const txt = await res.text();
+  out.textContent = txt;
+  if (res.ok) f.reset();
+});
+</script>
+</body>
+</html>
