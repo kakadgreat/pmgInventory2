@@ -1,13 +1,13 @@
 // netlify/functions/directory.mjs
-// Phone directory API: stores people/extensions and admin-only device fields.
+// Phone directory API with GET / POST / DELETE and a "dedupe" action.
 
 import { neon } from '@netlify/neon';
-const sql = neon(); // uses NETLIFY_DATABASE_URL
+const sql = neon();
 
 const headers = {
   'Content-Type': 'application/json',
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+  'Access-Control-Allow-Methods': 'GET,POST,DELETE,OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type',
 };
 
@@ -15,7 +15,6 @@ const KNOWN = [
   'slug','name','email','extension','team','role','status',
   'direct_phone','mobile','location','timezone','voice_enabled',
   'created_date','updated_date',
-  // admin-only
   'device_vendor','device_model','mac','ip','notes'
 ];
 
@@ -29,7 +28,7 @@ export async function handler(event){
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers, body: '' };
 
   try {
-    // Ensure table exists (idempotent)
+    // Ensure table
     await sql`CREATE TABLE IF NOT EXISTS directory (
       slug TEXT PRIMARY KEY,
       name TEXT, email TEXT,
@@ -43,18 +42,33 @@ export async function handler(event){
       updated_at TIMESTAMPTZ DEFAULT now()
     )`;
 
+    const url = new URL(event.rawUrl);
+    const action = url.searchParams.get('action');
+
+    // ---- GET ----
     if (event.httpMethod === 'GET') {
-      const url = new URL(event.rawUrl);
       const slug = url.searchParams.get('slug');
       const loc  = url.searchParams.get('loc');
       const team = url.searchParams.get('team');
       const stat = url.searchParams.get('status');
       const q    = (url.searchParams.get('q')||'').toLowerCase();
 
+      if (action === 'dedupe-preview') {
+        const rows = await sql`SELECT slug, name, extension, email, updated_at FROM directory`;
+        // group by key we dedupe on
+        const map = {};
+        for (const r of rows) {
+          const key = (r.extension || '').replace(/\D/g,'') || (r.email||'').toLowerCase() || (r.name||'').toLowerCase();
+          (map[key] ||= []).push(r);
+        }
+        const dups = Object.values(map).filter(arr => arr.length > 1);
+        return { statusCode: 200, headers, body: JSON.stringify({ groups: dups.length, samples: dups.slice(0,10) }) };
+      }
+
       let rows = await sql`SELECT * FROM directory`;
       if (slug) rows = rows.filter(r => r.slug === slug);
       if (loc)  rows = rows.filter(r => (r.location||'') === loc);
-      if (team) rows = rows.filter(r => (r.team||'').toLowerCase() === team.toLowerCase());
+      if (team) rows = rows.filter(r => (r.team||'').toLowerCase().includes(team.toLowerCase()));
       if (stat) rows = rows.filter(r => (r.status||'').toLowerCase() === stat.toLowerCase());
       if (q) {
         rows = rows.filter(r => {
@@ -65,6 +79,7 @@ export async function handler(event){
       return { statusCode: 200, headers, body: JSON.stringify(rows) };
     }
 
+    // ---- POST (insert / update, accepts single or batch) ----
     if (event.httpMethod === 'POST') {
       const body = JSON.parse(event.body || '{}');
       let items = [];
@@ -101,6 +116,36 @@ export async function handler(event){
         `;
       }
       return { statusCode: 200, headers, body: JSON.stringify({ ok:true, upserted: items.length }) };
+    }
+
+    // ---- DELETE (by slug) or action=dedupe ----
+    if (event.httpMethod === 'DELETE') {
+      if (action === 'dedupe') {
+        const res = await sql`
+          WITH canon AS (
+            SELECT slug,
+                   COALESCE(NULLIF(regexp_replace(COALESCE(extension,''), '\D', '', 'g'), ''),
+                            lower(trim(email)),
+                            lower(trim(name))) AS key,
+                   updated_at,
+                   ROW_NUMBER() OVER (PARTITION BY
+                     COALESCE(NULLIF(regexp_replace(COALESCE(extension,''), '\D', '', 'g'), ''),
+                              lower(trim(email)), lower(trim(name)))
+                     ORDER BY updated_at DESC, slug DESC) AS rn
+            FROM directory
+          )
+          DELETE FROM directory d
+          USING canon c
+          WHERE d.slug = c.slug AND c.rn > 1
+          RETURNING d.slug
+        `;
+        return { statusCode: 200, headers, body: JSON.stringify({ ok:true, removed: res.length }) };
+      }
+
+      const slug = url.searchParams.get('slug');
+      if (!slug) return { statusCode: 400, headers, body: JSON.stringify({ error:'slug required' }) };
+      await sql`DELETE FROM directory WHERE slug=${slug}`;
+      return { statusCode: 200, headers, body: JSON.stringify({ ok:true, removed: slug }) };
     }
 
     return { statusCode: 405, headers, body: JSON.stringify({ error:'Method not allowed' }) };
