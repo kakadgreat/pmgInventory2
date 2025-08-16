@@ -1,0 +1,30 @@
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Phone Directory</title>
+<link rel="stylesheet" href="style.css"/>
+</head><body>
+<header id="topbar" class="topbar">
+  <div class="topbar-inner">
+    <!-- No Home link on purpose -->
+    <nav id="nav" class="nav">
+      <span class="badge">Phone Directory</span>
+    </nav>
+  </div>
+</header>
+
+<main class="container">
+  <section class="pill">
+    <h1>Phone Directory</h1>
+    <div class="filters">
+      <input id="q_phone" type="search" placeholder="Search name, extension, role, team…"/>
+      <select id="loc_phone"><option value="">All locations</option></select>
+      <select id="team_phone"><option value="">All teams</option></select>
+      <select id="status_phone"><option value="">Any status</option><option>Active</option><option>Inactive</option></select>
+    </div>
+    <div class="grid" id="phone_results"></div>
+  </section>
+</main>
+
+<script src="script.js"></script>
+<script>initPhoneDirectory();</script>
+</body></html>
