@@ -1,0 +1,8 @@
+
+<h1>Inventory Site (Netlify‑ready)</h1>
+<p>This folder contains a static inventory browser built from your Excel file. To keep adding data from different offices, you have two easy storage options on Netlify:</p>
+<ol>
+<li><strong>Netlify DB (Postgres via Neon)</strong> – Best for structured, multi-user data. Create tables like <code>items</code> and <code>locations</code>, then add a small Function <code>netlify/functions/inventory.mjs</code> that exposes GET/POST for the front-end.</li>
+<li><strong>Netlify Blobs</strong> – Simple key/value JSON. Good for quick uploads of the latest <code>inventory.json</code> per site or per office.</li>
+</ol>
+<p>If you want, I can add the Function and DB schema in a follow-up so you can push updates directly from the website (no spreadsheets needed).</p>

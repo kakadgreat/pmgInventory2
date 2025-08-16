@@ -1,0 +1,10 @@
+{
+  "name": "inventory-site-netlify",
+  "private": true,
+  "dependencies": {
+    "@netlify/neon": "^0.1.0"
+  },
+  "scripts": {
+    "build": "echo no-build"
+  }
+}

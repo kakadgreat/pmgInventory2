@@ -1,0 +1,29 @@
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Inventory Admin</title><link rel="stylesheet" href="../style.css"/></head><body>
+<header class="topbar"><div class="topbar-inner"><a href="../index.html" class="btn">← Back</a><strong style="margin-left:.5rem">Admin</strong></div></header>
+<main class="container">
+  <section class="pill">
+    <h1>Upload to Netlify DB</h1>
+    <p class="small">This posts the current <code>assets/inventory.json</code> (or a JSON file you choose) to <code>/.netlify/functions/inventory</code>.</p>
+    <div class="row"><button class="btn" id="sendLocal">Send bundled JSON</button><input type="file" id="file" accept=".json"/></div>
+    <pre id="out" style="background:#0b1021;color:#e5e7eb;padding:12px;border-radius:12px;white-space:pre-wrap"></pre>
+  </section>
+</main>
+<script>
+async function postItems(items){
+  const res = await fetch('/.netlify/functions/inventory',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({items})});
+  return await res.text();
+}
+document.getElementById('sendLocal').addEventListener('click', async () => {
+  const r = await fetch('../assets/inventory.json'); const items = await r.json();
+  const out = await postItems(items); document.getElementById('out').textContent = out;
+});
+document.getElementById('file').addEventListener('change', async (e) => {
+  const f = e.target.files?.[0]; if(!f) return;
+  const text = await f.text();
+  let items = []; try{ items = JSON.parse(text); } catch(e){ alert('Please upload JSON for now.'); return; }
+  const out = await postItems(items); document.getElementById('out').textContent = out;
+});
+</script>
+</body></html>

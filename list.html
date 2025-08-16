@@ -1,0 +1,29 @@
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Inventory List</title><link rel="stylesheet" href="style.css"/></head><body>
+
+  <header id="topbar" class="topbar">
+    <div class="topbar-inner">
+      <button class="hamburger" id="hamburger" aria-label="Toggle menu" aria-expanded="false">☰</button>
+      <nav id="nav" class="nav">
+        <a href="index.html">Home</a>
+        <a href="list.html">List</a>
+        <a href="locations.html">Locations</a>
+        <a href="assets/inventory.json">Data (JSON)</a>
+        <a href="readme.html">README</a>
+      </nav>
+    </div>
+  </header>
+
+<main class="container">
+  <section class="pill">
+    <h1 id="heading">All Inventory</h1>
+    <div class="searchbar">
+      <input id="q" type="search" placeholder="Search by model, user, serial, asset tag…"/>
+      <select id="loc"><option value="">All locations</option></select>
+    </div>
+    <div class="grid" id="results"></div>
+  </section>
+</main>
+<script src="script.js"></script><script>initList();</script>
+</body></html>

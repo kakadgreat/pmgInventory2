@@ -1,0 +1,26 @@
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Inventory by Location</title><link rel="stylesheet" href="style.css"/></head><body>
+
+  <header id="topbar" class="topbar">
+    <div class="topbar-inner">
+      <button class="hamburger" id="hamburger" aria-label="Toggle menu" aria-expanded="false">☰</button>
+      <nav id="nav" class="nav">
+        <a href="index.html">Home</a>
+        <a href="list.html">List</a>
+        <a href="locations.html">Locations</a>
+        <a href="assets/inventory.json">Data (JSON)</a>
+        <a href="readme.html">README</a>
+      </nav>
+    </div>
+  </header>
+
+<main class="container">
+  <section class="pill">
+    <h1>Locations</h1>
+    <p class="small">Grouped by the <code>location</code> column (or similar) in your spreadsheet.</p>
+  </section>
+  <div id="locations"></div>
+</main>
+<script src="script.js"></script><script>initLocations();</script>
+</body></html>
