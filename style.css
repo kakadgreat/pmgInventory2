@@ -113,3 +113,7 @@ input.active-filter::placeholder { color:#065f46; opacity:.6; }
 #categoryBar{ display:flex; gap:.5rem; flex-wrap:wrap; margin:.5rem 0; }
 .filters{ display:flex; gap:.5rem; flex-wrap:wrap; margin:.5rem 0; }
 .filters select{ padding:.5rem; border:1px solid var(--line); border-radius:10px; }
+
+/* Phone directory: keep the Teams dropdown compact */
+#team_phone { max-width: 220px; }
+.filters > * { flex: 0 0 auto; }  /* prevent flex children from stretching full width */
