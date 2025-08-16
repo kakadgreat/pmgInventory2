@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Add Directory Entry</title>
+<link rel="stylesheet" href="../style.css"/>
+</head>
+<body>
+<header class="topbar"><div class="topbar-inner">
+  <a class="btn" href="../index.html">← Home</a>
+  <a class="btn" href="./">Admin</a>
+  <strong style="margin-left:.5rem">Add Directory Entry</strong>
+</div></header>
+
+<main class="container">
+  <section class="pill">
+    <form id="f" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px">
+      <label>Name <input name="name" required></label>
+      <label>Extension <input name="extension" required></label>
+
+      <label>Direct phone <input name="direct_phone" placeholder="tel"></label>
+      <label>Mobile <input name="mobile" placeholder="tel"></label>
+
+      <label>Email <input name="email" type="email"></label>
+      <label>Role <input name="role"></label>
+
+      <label>Team
+        <select name="team" id="team"></select>
+      </label>
+      <label>Status
+        <select name="status"><option>Active</option><option>Inactive</option></select>
+      </label>
+
+      <label>Location
+        <select name="location" id="location"></select>
+      </label>
+      <label>Timezone <input name="timezone" placeholder="America/New_York"></label>
+
+      <!-- Admin-only device fields -->
+      <label>Device vendor <input name="device_vendor"></label>
+      <label>Device model <input name="device_model"></label>
+      <label>MAC <input name="mac"></label>
+      <label>IP <input name="ip"></label>
+
+      <label style="grid-column:1/-1">Notes <input name="notes"></label>
+      <button class="btn primary" type="submit" style="grid-column:1/-1">Save</button>
+    </form>
+    <pre id="out" class="small" style="margin-top:8px"></pre>
+  </section>
+</main>
+
+<script>
+async function loadCfg(){
+  try { const r = await fetch('/.netlify/functions/config'); if (r.ok) return await r.json(); } catch {}
+  return (await (await fetch('../assets/config.json')).json());
+}
+function fillSelect(sel, items){ sel.innerHTML=''; (items||[]).forEach(v => sel.insertAdjacentHTML('beforeend', `<option>${v}</option>`)); }
+(async () => {
+  const cfg = await loadCfg();
+  fillSelect(document.getElementById('location'), cfg.locations||[]);
+  fillSelect(document.getElementById('team'), cfg.teams||[]);
+})();
+const f = document.getElementById('f'), out = document.getElementById('out');
+f.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const x = Object.fromEntries(new FormData(f).entries());
+  Object.keys(x).forEach(k => { if(x[k]==='') delete x[k]; });
+  const res = await fetch('/.netlify/functions/directory', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ item: x }) });
+  const txt = await res.text(); out.textContent = txt; if (res.ok) f.reset();
+});
+</script>
+</body>
+</html>
