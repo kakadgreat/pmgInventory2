@@ -1,5 +1,6 @@
 // netlify/functions/directory.mjs
-// Phone directory API with GET / POST / DELETE and a "dedupe" action.
+// Phone directory API with GET / POST / DELETE, plus actions: dedupe, wipe.
+// Slug is stable: name + digits-only extension, or email, or name.
 
 import { neon } from '@netlify/neon';
 const sql = neon();
@@ -18,17 +19,19 @@ const KNOWN = [
   'device_vendor','device_model','mac','ip','notes'
 ];
 
-function makeSlug(x){
-  const s = (x.slug || `${x.name||''}-${x.extension||''}` || 'entry')
-    .toLowerCase().normalize('NFKD').replace(/[^\w]+/g,'-').replace(/(^-|-$)/g,'');
-  return s || `entry-${Date.now()}`;
+function stableSlug(x){
+  const name = String(x.name||'').trim().toLowerCase();
+  const extDigits = String(x.extension||'').replace(/\D/g,'');     // ← digits-only
+  const base = (name && extDigits) ? `${name}-${extDigits}`
+             : (x.email ? String(x.email).trim().toLowerCase() : name || 'entry');
+  return base.normalize('NFKD').replace(/[^\w]+/g,'-').replace(/(^-|-$)/g,'') || `entry-${Date.now()}`;
 }
 
 export async function handler(event){
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers, body: '' };
 
   try {
-    // Ensure table
+    // ensure table
     await sql`CREATE TABLE IF NOT EXISTS directory (
       slug TEXT PRIMARY KEY,
       name TEXT, email TEXT,
@@ -45,25 +48,13 @@ export async function handler(event){
     const url = new URL(event.rawUrl);
     const action = url.searchParams.get('action');
 
-    // ---- GET ----
+    // ---------- GET ----------
     if (event.httpMethod === 'GET') {
       const slug = url.searchParams.get('slug');
       const loc  = url.searchParams.get('loc');
       const team = url.searchParams.get('team');
       const stat = url.searchParams.get('status');
       const q    = (url.searchParams.get('q')||'').toLowerCase();
-
-      if (action === 'dedupe-preview') {
-        const rows = await sql`SELECT slug, name, extension, email, updated_at FROM directory`;
-        // group by key we dedupe on
-        const map = {};
-        for (const r of rows) {
-          const key = (r.extension || '').replace(/\D/g,'') || (r.email||'').toLowerCase() || (r.name||'').toLowerCase();
-          (map[key] ||= []).push(r);
-        }
-        const dups = Object.values(map).filter(arr => arr.length > 1);
-        return { statusCode: 200, headers, body: JSON.stringify({ groups: dups.length, samples: dups.slice(0,10) }) };
-      }
 
       let rows = await sql`SELECT * FROM directory`;
       if (slug) rows = rows.filter(r => r.slug === slug);
@@ -79,7 +70,7 @@ export async function handler(event){
       return { statusCode: 200, headers, body: JSON.stringify(rows) };
     }
 
-    // ---- POST (insert / update, accepts single or batch) ----
+    // ---------- POST (upsert; accepts single or array) ----------
     if (event.httpMethod === 'POST') {
       const body = JSON.parse(event.body || '{}');
       let items = [];
@@ -90,7 +81,7 @@ export async function handler(event){
 
       for (const raw of items) {
         const x = { ...raw };
-        x.slug = makeSlug(x);
+        x.slug = x.slug || stableSlug(x);
 
         const extra = {};
         for (const k of Object.keys(x)) if (!KNOWN.includes(k)) extra[k] = x[k];
@@ -118,8 +109,15 @@ export async function handler(event){
       return { statusCode: 200, headers, body: JSON.stringify({ ok:true, upserted: items.length }) };
     }
 
-    // ---- DELETE (by slug) or action=dedupe ----
+    // ---------- DELETE ----------
     if (event.httpMethod === 'DELETE') {
+      // action=wipe  → delete ALL rows (useful before a clean import)
+      if (action === 'wipe') {
+        await sql`TRUNCATE TABLE directory`;
+        return { statusCode: 200, headers, body: JSON.stringify({ ok:true, wiped:true }) };
+      }
+
+      // action=dedupe → keep newest per (extDigits OR email OR name)
       if (action === 'dedupe') {
         const res = await sql`
           WITH canon AS (
@@ -142,7 +140,8 @@ export async function handler(event){
         return { statusCode: 200, headers, body: JSON.stringify({ ok:true, removed: res.length }) };
       }
 
-      const slug = url.searchParams.get('slug');
+      // delete one row by slug
+      const slug = new URL(event.rawUrl).searchParams.get('slug');
       if (!slug) return { statusCode: 400, headers, body: JSON.stringify({ error:'slug required' }) };
       await sql`DELETE FROM directory WHERE slug=${slug}`;
       return { statusCode: 200, headers, body: JSON.stringify({ ok:true, removed: slug }) };
