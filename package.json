@@ -2,9 +2,8 @@
   "name": "inventory-site-netlify",
   "private": true,
   "dependencies": {
-    "@netlify/neon": "^0.1.0"
+    "@netlify/neon": "^0.1.0",
+    "@netlify/blobs": "^6.0.0"
   },
-  "scripts": {
-    "build": "echo no-build"
-  }
+  "scripts": { "build": "echo no-build" }
 }
