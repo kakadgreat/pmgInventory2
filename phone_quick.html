@@ -1,0 +1,67 @@
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Quick Phone Directory</title>
+<link rel="stylesheet" href="style.css"/>
+</head><body>
+<header id="topbar" class="topbar">
+  <div class="topbar-inner">
+    <nav id="nav" class="nav"><span class="badge">Quick Phone Directory</span></nav>
+  </div>
+</header>
+
+<main class="container">
+  <section class="pill">
+    <div class="row" style="justify-content:space-between">
+      <h1>Quick Reference</h1>
+      <div class="row">
+        <button class="btn" onclick="window.print()">Export PDF</button>
+      </div>
+    </div>
+    <div class="small">Blocks are grouped by team. Bold = Name & Extension.</div>
+  </section>
+
+  <div id="quick" class="pill"></div>
+</main>
+
+<script>
+const TEAMS_ORDER = ["PROVIDERS","FRONT OFFICE","BILLING","ADMINISTRATION","MA","PEDIATRICS","SPA","CALL CENTER","IT","LEADERSHIP"];
+function tokenizeTeams(s){ return String(s||'').split(',').map(t=>t.trim()).filter(Boolean); }
+async function loadDir(){ const r=await fetch('/.netlify/functions/directory',{cache:'no-store'}); return r.ok?await r.json():[]; }
+
+function renderQuick(data){
+  const host = document.getElementById('quick'); host.innerHTML='';
+  const byTeam = {};
+  data.forEach(x=>{
+    const toks = tokenizeTeams(x.team);
+    if (!toks.length) toks.push('Unassigned');
+    toks.forEach(t => { (byTeam[t] ||= []).push(x); });
+  });
+
+  const order = [...TEAMS_ORDER, ...Object.keys(byTeam).filter(t=>!TEAMS_ORDER.includes(t))];
+  order.forEach(team=>{
+    const list = (byTeam[team]||[]).sort((a,b)=> (a.name||'').localeCompare(b.name||''));
+    if (!list.length) return;
+    const block = document.createElement('section'); block.className='team-block';
+    block.innerHTML = `<h2>${team}</h2><div class="quick-grid"></div>`;
+    const grid = block.querySelector('.quick-grid');
+    list.forEach(x=>{
+      const dept = x.role || ''; // if you later add a real dept field, swap it here
+      const card = document.createElement('div');
+      card.className='quick-card';
+      card.innerHTML = `
+        <div><b>${x.name||'-'}</b></div>
+        <div><b>${x.extension||'-'}</b></div>
+        <div class="small">${x.location||'-'}${dept?(' • '+dept):''}</div>
+      `;
+      grid.appendChild(card);
+    });
+    host.appendChild(block);
+  });
+}
+
+(async () => {
+  const data = await loadDir();
+  renderQuick(data);
+})();
+</script>
+</body></html>
