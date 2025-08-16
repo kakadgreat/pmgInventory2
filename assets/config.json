@@ -3,5 +3,16 @@
     "Desktops","Laptops","Phones","Printers","Scanners",
     "Tablets","Monitors","Networking","Peripherals","Servers/NAS","Other"
   ],
-  "locations": []
+  "locations": [
+    "Jasper Primary Care",
+    "Jasper Pediatrics",
+    "Jasper MedSpa",
+    "Roswell Primary Care",
+    "Roswell MedSpa",
+    "Canton Primary Care",
+    "Canton Pediatrics",
+    "Canton MedSpa",
+    "Rome Primary Care",
+    "Rome MedSpa"
+  ]
 }
