@@ -7,14 +7,13 @@
 </head>
 <body>
 <header class="topbar"><div class="topbar-inner">
-  <a class="btn" href="../index.html">← Home</a>
   <a class="btn" href="../phone.html">View Directory</a>
   <strong style="margin-left:.5rem">Manage Directory</strong>
 </div></header>
 
 <main class="container">
   <section class="pill">
-    <div class="row" style="justify-content:space-between;gap:.5rem">
+    <div class="row" style="justify-content:space-between;gap:.5rem;flex-wrap:wrap">
       <div class="row">
         <input id="q" type="search" placeholder="Search name / ext / email" />
         <select id="loc"><option value="">All locations</option></select>
@@ -24,13 +23,13 @@
       <div class="row">
         <a class="btn" href="phone_add.html">+ Add</a>
         <a class="btn" href="phone_upload.html">Bulk upload</a>
-        <button class="btn" id="dedupe">🧹 Dedupe now</button>
+        <button class="btn" id="dedupe">🧹 Dedupe</button>
+        <button class="btn" id="wipe" style="border-color:#ef4444;color:#991b1b">🗑️ Delete ALL</button>
       </div>
     </div>
   </section>
 
   <section class="pill">
-    <div class="small">Click <b>Edit</b> to expand a row. Save applies immediately.</div>
     <div id="table"></div>
   </section>
 </main>
@@ -44,7 +43,7 @@ function rowHtml(x, cfg){
   const teams = (cfg.teams||[]).map(t=>`<option ${((x.team||'').toLowerCase().includes(t.toLowerCase()))?'selected':''}>${t}</option>`).join('');
   const locs  = (cfg.locations||[]).map(t=>`<option ${((x.location||'')===t)?'selected':''}>${t}</option>`).join('');
   return `
-  <div style="border:1px solid var(--line); border-radius:12px; padding:.5rem; margin:.4rem 0">
+  <div style="border:1px solid var(--line); border-radius:12px; padding:.6rem; margin:.5rem 0">
     <div class="row" style="justify-content:space-between">
       <div><b>${x.name||'-'}</b> • <span class="small">Ext ${x.extension||'-'}</span> • <span class="small">${x.location||'-'}</span></div>
       <div class="row">
@@ -78,7 +77,6 @@ function rowHtml(x, cfg){
   const cfg = await loadCfg();
   let data = await loadDir();
 
-  // Filters header
   const q=document.getElementById('q'), locSel=document.getElementById('loc'), teamSel=document.getElementById('team'), statSel=document.getElementById('stat');
   setOpts(locSel, cfg.locations.length?cfg.locations:data.map(x=>x.location), 'All locations');
   setOpts(teamSel, cfg.teams.length?cfg.teams:[], 'All teams');
@@ -94,7 +92,6 @@ function rowHtml(x, cfg){
     const mount = document.getElementById('table');
     mount.innerHTML = html || '<div class="small">No results.</div>';
 
-    // wire buttons
     mount.querySelectorAll('[data-edit]').forEach(btn => {
       btn.onclick = () => {
         const id = 'form-' + btn.dataset.edit;
@@ -124,13 +121,16 @@ function rowHtml(x, cfg){
   locSel.addEventListener('change', render); teamSel.addEventListener('change', render); statSel.addEventListener('change', render);
   render();
 
-  // Dedupe button
+  // buttons
   document.getElementById('dedupe').onclick = async () => {
-    if (!confirm('This will remove older duplicates (same Name+Extension). Continue?')) return;
+    if (!confirm('Remove older duplicates (keep newest per person/extension)?')) return;
     const r = await fetch('/.netlify/functions/directory?action=dedupe', { method:'DELETE' });
-    const j = await r.json();
-    alert(j.ok ? `Removed ${j.removed} duplicate(s).` : 'Error');
-    data = await loadDir(); render();
+    const j = await r.json(); alert(j.ok ? `Removed ${j.removed} duplicate(s).` : 'Error'); data = await loadDir(); render();
+  };
+  document.getElementById('wipe').onclick = async () => {
+    if (!confirm('DELETE ALL records? This cannot be undone.')) return;
+    const r = await fetch('/.netlify/functions/directory?action=wipe', { method:'DELETE' });
+    const j = await r.json(); alert(j.ok ? 'All rows deleted.' : 'Error'); data = await loadDir(); render();
   };
 })();
 </script>
