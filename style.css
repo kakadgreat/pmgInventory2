@@ -89,16 +89,16 @@ body{
   border:1px solid var(--line); background:var(--badge); color:#111827; font-size:.78rem;
 }
 
-/* warranty colors */
+/* warranty/status colors */
 .badge.ok { background:#ecfdf5; color:#065f46; border-color:#bbf7d0; }      /* Active */
-.badge.bad { background:#fef2f2; color:#991b1b; border-color:#fecaca; }     /* Deactivated */
+.badge.bad { background:#fef2f2; color:#991b1b; border-color:#fecaca; }     /* Inactive/Deactivated */
 
 /* ====== Inputs ====== */
-input[type="search"], input[type="text"], select{
+input[type="search"], input[type="text"], select, textarea{
   padding:.55rem .65rem;
   border:1px solid var(--line); border-radius:10px; background:#fff; color:var(--text);
 }
-input:focus, select:focus{ outline:none; box-shadow:0 0 0 3px rgba(59,130,246,.15); }
+input:focus, select:focus, textarea:focus{ outline:none; box-shadow:0 0 0 3px rgba(59,130,246,.15); }
 
 /* active filter highlight */
 .active-filter {
@@ -109,11 +109,12 @@ input:focus, select:focus{ outline:none; box-shadow:0 0 0 3px rgba(59,130,246,.1
 }
 input.active-filter::placeholder { color:#065f46; opacity:.6; }
 
-/* category bar + filters */
-#categoryBar{ display:flex; gap:.5rem; flex-wrap:wrap; margin:.5rem 0; }
-.filters{ display:flex; gap:.5rem; flex-wrap:wrap; margin:.5rem 0; }
-.filters select{ padding:.5rem; border:1px solid var(--line); border-radius:10px; }
+/* category / team chip bars */
+#categoryBar, .chips{ display:flex; gap:.5rem; flex-wrap:wrap; margin:.5rem 0; }
+.chip{
+  border:1px solid var(--line); background:var(--panel); color:var(--text);
+  padding:.35rem .65rem; border-radius:999px; cursor:pointer; user-select:none;
+}
+.chip.active{ background:#ecfdf5; border-color:#10b981; color:#065f46; }
 
-/* Phone directory: keep the Teams dropdown compact */
-#team_phone { max-width: 220px; }
-.filters > * { flex: 0 0 auto; }  /* prevent flex children from stretching full width */
+/* filters*
