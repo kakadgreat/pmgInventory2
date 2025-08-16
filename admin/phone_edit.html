@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Edit Directory Entry</title>
+<link rel="stylesheet" href="../style.css"/>
+</head>
+<body>
+<header class="topbar"><div class="topbar-inner">
+  <a class="btn" href="../phone.html">← Back to Directory</a>
+  <strong style="margin-left:.5rem">Edit Entry</strong>
+</div></header>
+
+<main class="container">
+  <section class="pill">
+    <form id="f" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px">
+      <input type="hidden" id="slug" name="slug">
+      <label>Name <input id="name" name="name" required></label>
+      <label>Extension <input id="extension" name="extension" required></label>
+
+      <label>Direct phone <input id="direct_phone" name="direct_phone"></label>
+      <label>Mobile <input id="mobile" name="mobile"></label>
+
+      <label>Email <input id="email" name="email" type="email"></label>
+      <label>Role <input id="role" name="role"></label>
+
+      <label>Team
+        <select id="team" name="team"></select>
+      </label>
+      <label>Status
+        <select id="status" name="status"><option>Active</option><option>Inactive</option></select>
+      </label>
+
+      <label>Location
+        <select id="location" name="location"></select>
+      </label>
+      <label>Timezone <input id="timezone" name="timezone"></label>
+
+      <label>Device vendor <input id="device_vendor" name="device_vendor"></label>
+      <label>Device model <input id="device_model" name="device_model"></label>
+      <label>MAC <input id="mac" name="mac"></label>
+      <label>IP <input id="ip" name="ip"></label>
+
+      <label style="grid-column:1/-1">Notes <input id="notes" name="notes"></label>
+      <button class="btn primary" type="submit" style="grid-column:1/-1">Save</button>
+    </form>
+    <pre id="out" class="small" style="margin-top:8px"></pre>
+  </section>
+</main>
+
+<script>
+async function loadCfg(){
+  try { const r = await fetch('/.netlify/functions/config'); if (r.ok) return await r.json(); } catch {}
+  return (await (await fetch('../assets/config.json')).json());
+}
+function fillSelect(sel, items){ sel.innerHTML=''; (items||[]).forEach(v => sel.insertAdjacentHTML('beforeend', `<option>${v}</option>`)); }
+async function loadEntry(slug){
+  const r = await fetch('/.netlify/functions/directory?slug='+encodeURIComponent(slug));
+  const arr = await r.json(); return arr[0] || {};
+}
+(async () => {
+  const params = new URLSearchParams(location.search);
+  const slug = params.get('slug'); if(!slug){ alert('Missing slug'); history.back(); return; }
+
+  const cfg = await loadCfg();
+  fillSelect(document.getElementById('location'), cfg.locations||[]);
+  fillSelect(document.getElementById('team'), cfg.teams||[]);
+
+  const x = await loadEntry(slug);
+  ['slug','name','extension','direct_phone','mobile','email','role','team','status','location','timezone','device_vendor','device_model','mac','ip','notes']
+    .forEach(id => { const el = document.getElementById(id); if(el) el.value = x[id] || ''; });
+
+  document.getElementById('f').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const o = Object.fromEntries(new FormData(e.target).entries());
+    Object.keys(o).forEach(k => { if(o[k]==='') delete o[k]; });
+    o.slug = slug;
+    const res = await fetch('/.netlify/functions/directory', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ item:o })});
+    const txt = await res.text(); document.getElementById('out').textContent = txt;
+  });
+})();
+</script>
+</body>
+</html>
