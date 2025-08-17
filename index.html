@@ -1,47 +1,121 @@
-<!doctype html><html lang="en"><head>
+<!doctype html>
+<html lang="en">
+<head>
 <meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Company Inventory</title><link rel="stylesheet" href="style.css"/></head><body>
+<title>Inventory Home</title>
+<link rel="stylesheet" href="style.css"/>
+<!-- Chart.js for tiny pies in the sidebar -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
 <header id="topbar" class="topbar">
   <div class="topbar-inner">
-    <button class="hamburger" id="hamburger" aria-label="Toggle menu" aria-expanded="false">☰</button>
-    <nav id="nav" class="nav">
-      <a href="index.html">Home</a>
-      <a href="list.html">List</a>
-      <a class="btn" href="table.html">Table</a>
-      <a href="locations.html">Locations</a>
-      <a href="assets/inventory.json">Data (JSON)</a>
-      <a href="readme.html">README</a>
-      <a class="btn" href="phone.html">Phone Directory</a>
-    </nav>
+    <a class="btn" href="index.html">Home</a>
+    <a class="btn" href="list.html">List</a>
+    <a class="btn" href="table.html">Table</a>
+    <a class="btn" href="locations.html">Locations</a>
+    <a class="btn" href="data.json">Data (JSON)</a>
+    <a class="btn" href="README.html">README</a>
+    <a class="btn" href="phone.html">Phone Directory</a>
   </div>
 </header>
 
 <main class="container">
-  <!-- NEW: Quick actions with Add Item -->
+  <!-- Quick actions -->
   <section class="pill">
     <h2>Quick actions</h2>
     <p class="small">Add or manage items right from here.</p>
-    <div class="row">
-      <a class="btn primary" href="admin/add.html">Add Item</a>
+    <div class="row" style="gap:.5rem; flex-wrap:wrap">
+      <a class="btn primary" href="admin/add">Add Item</a>
       <a class="btn" href="admin/">Admin</a>
-      <a class="btn" href="admin/config.html">Config</a>
+      <a class="btn" href="/.netlify/functions/config">Config</a>
       <a class="btn" href="phone.html">Phone Directory</a>
     </div>
   </section>
 
+  <!-- Inventory Overview with small charts on the right -->
   <section class="pill">
-    <h1>Inventory Overview</h1>
+    <h2>Inventory Overview</h2>
     <p class="small">Data parsed from <em>Computer Inventory 2025 Ankur.xlsx</em>. Click a category to view details.</p>
-    <div class="row" id="categoryList"></div>
-  </section>
 
-  <section class="pill">
-    <h2>Recently Parsed Items</h2>
-    <div class="grid" id="recent"></div>
-  </section>
+    <div class="overview-grid">
+      <!-- Left: pills with counts -->
+      <div id="catPills" class="chips"></div>
 
-  <footer>Static site — you can move data into Netlify DB or Blobs later for editing from the web.</footer>
+      <!-- Right: compact charts rail -->
+      <aside class="overview-side">
+        <div class="mini-chart">
+          <h3>By Category</h3>
+          <canvas id="catChart"></canvas>
+        </div>
+        <div class="mini-chart">
+          <h3>Warranty</h3>
+          <canvas id="warChart"></canvas>
+        </div>
+      </aside>
+    </div>
+  </section>
 </main>
 
-<script src="script.js"></script><script>initIndex();</script>
-</body></html>
+<script>
+const PALETTE=["#10b981","#60a5fa","#f59e0b","#ef4444","#a78bfa","#34d399","#f472b6","#f97316","#22d3ee","#84cc16"];
+
+async function load(){ try{ const r=await fetch('/.netlify/functions/inventory',{cache:'no-store'}); if(r.ok) return await r.json(); }catch(e){} return []; }
+async function cfg(){ try{ const r=await fetch('/.netlify/functions/config'); if(r.ok) return await r.json(); }catch(e){} return { categories:["Desktops","Laptops","Phones","Other"] }; }
+
+function by(list, key){
+  const m=new Map();
+  list.forEach(x=>{
+    const k = (typeof key==='function')? key(x) : (x[key]||'Unknown');
+    m.set(k,(m.get(k)||0)+1);
+  });
+  return m;
+}
+
+function pill(label, n){
+  const url = 'list.html?category='+encodeURIComponent(label);
+  return `<a class="chip" href="${url}">${label} (${n})</a>`;
+}
+
+function makePie(ctx, labels, values){
+  const colors = labels.map((_,i)=>PALETTE[i%PALETTE.length]);
+  return new Chart(ctx,{
+    type:'pie',
+    data:{ labels, datasets:[{ data:values, backgroundColor:colors, borderColor:'#fff', borderWidth:2 }]},
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } } }
+  });
+}
+
+function normWarranty(s){
+  s = String(s||'').trim().toLowerCase();
+  if(s==='active'||s==='deactivated') return s[0].toUpperCase()+s.slice(1);
+  return 'Unknown';
+}
+
+(async () => {
+  const [data, conf] = await Promise.all([load(), cfg()]);
+
+  // Build category pills
+  const catCounts = by(data,'category');
+  const order = (conf.categories?.length ? conf.categories : Array.from(catCounts.keys()));
+  const catHost = document.getElementById('catPills');
+  catHost.innerHTML = order
+    .filter(Boolean)
+    .map(k => pill(k, catCounts.get(k)||0))
+    .join('');
+
+  // Small pies on the right
+  // Category pie
+  const catLabels = order.filter(Boolean);
+  const catValues = catLabels.map(k=>catCounts.get(k)||0);
+  makePie(document.getElementById('catChart').getContext('2d'), catLabels, catValues);
+
+  // Warranty pie
+  const wCounts = by(data, x => normWarranty(x.warranty_status));
+  const wLabels = ['Active','Deactivated','Unknown'].filter(k=>wCounts.has(k));
+  const wValues = wLabels.map(k=>wCounts.get(k)||0);
+  makePie(document.getElementById('warChart').getContext('2d'), wLabels, wValues);
+})();
+</script>
+</body>
+</html>
