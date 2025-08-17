@@ -1,26 +1,112 @@
-<!doctype html><html lang="en"><head>
+<!doctype html>
+<html lang="en">
+<head>
 <meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Inventory by Location</title><link rel="stylesheet" href="style.css"/></head><body>
-
-  <header id="topbar" class="topbar">
-    <div class="topbar-inner">
-      <button class="hamburger" id="hamburger" aria-label="Toggle menu" aria-expanded="false">☰</button>
-      <nav id="nav" class="nav">
-        <a href="index.html">Home</a>
-        <a href="list.html">List</a>
-        <a href="locations.html">Locations</a>
-        <a href="assets/inventory.json">Data (JSON)</a>
-        <a href="readme.html">README</a>
-      </nav>
-    </div>
-  </header>
+<title>Locations</title>
+<link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+<header id="topbar" class="topbar">
+  <div class="topbar-inner">
+    <a class="btn" href="index.html">← Home</a>
+    <a class="btn" href="list.html">Cards</a>
+    <a class="btn" href="table.html">Table</a>
+    <strong style="margin-left:.5rem">Locations</strong>
+  </div>
+</header>
 
 <main class="container">
   <section class="pill">
-    <h1>Locations</h1>
-    <p class="small">Grouped by the <code>location</code> column (or similar) in your spreadsheet.</p>
+    <h2 style="margin:0 0 .25rem 0">Filters</h2>
+
+    <!-- category chips -->
+    <div id="chips" class="chips"></div>
+
+    <div class="filters">
+      <input id="q" type="search" placeholder="Search title / serial / user…" />
+      <button class="btn print-hide" onclick="window.print()">Print</button>
+    </div>
   </section>
+
   <div id="locations"></div>
 </main>
-<script src="script.js"></script><script>initLocations();</script>
-</body></html>
+
+<script>
+async function load(){ try{ const r=await fetch('/.netlify/functions/inventory',{cache:'no-store'}); if(r.ok) return await r.json(); }catch{} return []; }
+function groupBy(xs,k){ return xs.reduce((a,x)=>((a[x[k]||'']=(a[x[k]||'']||[]).concat(x)),a),{}); }
+function as(el,html){ el.innerHTML=html; }
+function chip(label,active){ return `<span class="chip ${active?'active':''}" data-cat="${label}">${label}</span>`; }
+
+function renderCards(list, mountId){
+  const el=document.getElementById(mountId); if(!el) return; el.innerHTML='';
+  if(!Array.isArray(list)||!list.length){ el.insertAdjacentHTML('beforeend','<div class="small">No items found.</div>'); return; }
+  list.forEach(x=>{
+    const w=(x.warranty_status||'').toLowerCase(); const wBadge=w?`<span class="badge ${w==='active'?'ok':'bad'}">${x.warranty_status}</span>`:'';
+    const tags=[x.brand,x.model,x.os].filter(Boolean).map(t=>`<span class="badge">${t}</span>`).join(' ');
+    el.insertAdjacentHTML('beforeend',`
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem">
+          <h3>${x.title||'-'}</h3>
+          <a class="btn" href="admin/edit.html?slug=${encodeURIComponent(x.slug||'')}">Edit</a>
+        </div>
+        <div class="row">${tags} ${wBadge}</div>
+        <div class="kv">
+          <div class="marker">Category</div><div>${x.category||'-'}</div>
+          <div class="marker">User</div><div>${x.user||x.user_name||'-'}</div>
+          <div class="marker">Room</div><div>${x.room||'-'}</div>
+          <div class="marker">Dept</div><div>${x.dept||'-'}</div>
+          <div class="marker">Asset / Serial</div><div>${[x.asset_tag,x.serial].filter(Boolean).join(' / ')||'-'}</div>
+          <div class="marker">Warranty Expires</div><div>${x.warranty_expires||'-'}</div>
+        </div>
+      </div>`);
+  });
+}
+
+(async () => {
+  const data = await load();
+  const byCat = groupBy(data,'category');
+  const catOrder = Object.keys(byCat).filter(Boolean).sort();
+  const activeCats = new Set();
+
+  // build chips
+  const chipsHost=document.getElementById('chips');
+  chipsHost.innerHTML = catOrder.map(c=>chip(c,false)).join('');
+  chipsHost.addEventListener('click', (e)=>{
+    const t=e.target.closest('[data-cat]'); if(!t) return;
+    const name=t.dataset.cat;
+    activeCats.has(name) ? activeCats.delete(name) : activeCats.add(name);
+    chipsHost.querySelectorAll('[data-cat]').forEach(el=>el.classList.toggle('active', activeCats.has(el.dataset.cat)));
+    run();
+  });
+
+  // render per-location groups
+  const wrap = document.getElementById('locations');
+  const q = document.getElementById('q');
+
+  function run(){
+    const text=(q.value||'').toLowerCase();
+    const locGroups = groupBy(data, 'location');
+    wrap.innerHTML='';
+    Object.keys(locGroups).sort().forEach(loc=>{
+      let list = locGroups[loc];
+      if(activeCats.size) list = list.filter(x=>activeCats.has(x.category||''));
+      if(text){
+        list = list.filter(x => (`${x.title} ${x.brand} ${x.model} ${x.serial} ${x.user} ${x.dept} ${x.room}`.toLowerCase().includes(text)));
+      }
+      if(!list.length) return;
+      const id = `loc-${loc.toLowerCase().replace(/[^\w]+/g,'-')}`;
+      wrap.insertAdjacentHTML('beforeend', `
+        <section class="pill">
+          <h2>${loc || 'Unspecified'} <span class="small">(${list.length})</span></h2>
+          <div class="grid" id="${id}"></div>
+        </section>
+      `);
+      renderCards(list, id);
+    });
+  }
+  q.addEventListener('input', run);
+  run();
+})();
+</script>
+</body>
+</html>
