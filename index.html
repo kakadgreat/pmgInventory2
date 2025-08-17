@@ -4,7 +4,6 @@
 <meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>Inventory Home</title>
 <link rel="stylesheet" href="style.css"/>
-<!-- Chart.js for tiny pies in the sidebar -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
@@ -33,24 +32,23 @@
     </div>
   </section>
 
-  <!-- Inventory Overview with small charts on the right -->
+  <!-- Inventory Overview: pills left, mini charts right -->
   <section class="pill">
     <h2>Inventory Overview</h2>
     <p class="small">Data parsed from <em>Computer Inventory 2025 Ankur.xlsx</em>. Click a category to view details.</p>
 
     <div class="overview-grid">
-      <!-- Left: pills with counts -->
       <div id="catPills" class="chips"></div>
 
-      <!-- Right: compact charts rail -->
       <aside class="overview-side">
         <div class="mini-chart">
           <h3>By Category</h3>
-          <canvas id="catChart"></canvas>
+          <!-- explicit height prevents growth -->
+          <canvas id="catChart" height="160"></canvas>
         </div>
         <div class="mini-chart">
           <h3>Warranty</h3>
-          <canvas id="warChart"></canvas>
+          <canvas id="warChart" height="160"></canvas>
         </div>
       </aside>
     </div>
@@ -71,46 +69,33 @@ function by(list, key){
   });
   return m;
 }
-
-function pill(label, n){
-  const url = 'list.html?category='+encodeURIComponent(label);
-  return `<a class="chip" href="${url}">${label} (${n})</a>`;
-}
-
+function pill(label, n){ return `<a class="chip" href="list.html?category=${encodeURIComponent(label)}">${label} (${n})</a>`; }
 function makePie(ctx, labels, values){
-  const colors = labels.map((_,i)=>PALETTE[i%PALETTE.length]);
+  const colors=labels.map((_,i)=>PALETTE[i%PALETTE.length]);
   return new Chart(ctx,{
     type:'pie',
     data:{ labels, datasets:[{ data:values, backgroundColor:colors, borderColor:'#fff', borderWidth:2 }]},
     options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } } }
   });
 }
-
-function normWarranty(s){
-  s = String(s||'').trim().toLowerCase();
-  if(s==='active'||s==='deactivated') return s[0].toUpperCase()+s.slice(1);
-  return 'Unknown';
-}
+function normWarranty(s){ s=String(s||'').trim().toLowerCase(); if(s==='active'||s==='deactivated') return s[0].toUpperCase()+s.slice(1); return 'Unknown'; }
 
 (async () => {
   const [data, conf] = await Promise.all([load(), cfg()]);
 
-  // Build category pills
+  // category pills
   const catCounts = by(data,'category');
   const order = (conf.categories?.length ? conf.categories : Array.from(catCounts.keys()));
-  const catHost = document.getElementById('catPills');
-  catHost.innerHTML = order
+  document.getElementById('catPills').innerHTML = order
     .filter(Boolean)
     .map(k => pill(k, catCounts.get(k)||0))
     .join('');
 
-  // Small pies on the right
-  // Category pie
+  // mini pies
   const catLabels = order.filter(Boolean);
   const catValues = catLabels.map(k=>catCounts.get(k)||0);
   makePie(document.getElementById('catChart').getContext('2d'), catLabels, catValues);
 
-  // Warranty pie
   const wCounts = by(data, x => normWarranty(x.warranty_status));
   const wLabels = ['Active','Deactivated','Unknown'].filter(k=>wCounts.has(k));
   const wValues = wLabels.map(k=>wCounts.get(k)||0);
