@@ -6,7 +6,7 @@
   <title>Inventory Table</title>
   <link rel="stylesheet" href="style.css"/>
 
-  <!-- Page-local CSS to ensure layout even if global styles change -->
+  <!-- Page-local styles: print layout + blue buttons -->
   <style>
     .actions-right{ display:flex; gap:.5rem; align-items:center; }
     .btn.blue{ background:#e0f2fe; border:1px solid #bae6fd; color:#075985; }
@@ -24,10 +24,29 @@
     .note{ padding:.5rem .75rem; border:1px solid #e5e7eb; border-radius:8px; background:#f9fafb; }
     .small{ font-size:.9rem; color:#6b7280; }
 
+    /* ---------- Print polishing ---------- */
+    @page{ size: Letter; margin: 0.5in; }
+    .print-only{ display:none; }
     @media print{
-      .col-actions{ display:none !important; }
-      table thead{ display:table-header-group; }
-      .actions-right, .chips, .filters, .btn, .note{ display:none !important; }
+      /* Hide chrome we don't want on paper */
+      .topbar, .actions-right, .chips, .filters, .btn, .note, #status { display:none !important; }
+
+      /* Show a nice print header */
+      .print-only{ display:block !important; }
+
+      /* Remove padding/borders from cards and container */
+      .container{ width:auto; margin:0; }
+      .pill{ background:transparent; border:none; padding:0; box-shadow:none; }
+
+      /* Make table full-width, bordered, readable */
+      .table-wrap{ border:none; box-shadow:none; overflow:visible !important; }
+      table{ width:100% !important; border-collapse:collapse !important; table-layout:fixed; }
+      thead{ display:table-header-group; } /* repeat on each page */
+      th, td{ border:1px solid #d1d5db !important; padding:6pt 8pt !important; font-size:10pt !important; vertical-align:top; }
+      th{ background:#f3f4f6 !important; color:#111827 !important; }
+
+      /* Avoid weird page breaks inside rows */
+      tr{ break-inside:avoid; page-break-inside:avoid; }
     }
   </style>
 </head>
@@ -42,6 +61,12 @@
   </header>
 
   <main class="container screenfill">
+    <!-- Visible only on print -->
+    <section class="print-only" style="margin-bottom:.5rem">
+      <h1 style="font-size:14pt; margin:0 0 4pt 0;">Inventory Overview</h1>
+      <div id="printMeta" style="font-size:9pt; color:#374151;"></div>
+    </section>
+
     <!-- Controls + overview chips -->
     <section class="pill">
       <h2 style="margin:0 0 .25rem 0">Inventory Overview</h2>
@@ -101,26 +126,15 @@
     }
     async function loadData(){
       try{
-        // 1) primary: serverless function
         return await fetchJSON('/.netlify/functions/inventory');
-      }catch(e1){
-        console.warn('Function fetch failed:', e1);
-        try{
-          // 2) fallback: static data.json (you have a nav link for this)
-          return await fetchJSON('/data.json');
-        }catch(e2){
-          console.warn('data.json fetch failed:', e2);
-          throw new Error('Could not load inventory from function or data.json');
-        }
+      }catch{
+        try{ return await fetchJSON('/data.json'); }
+        catch{ throw new Error('Could not load inventory from function or data.json'); }
       }
     }
-
     async function loadConfig(){
-      try{
-        return await fetchJSON('/.netlify/functions/config');
-      }catch{
-        return { locations: [], categories: [] };
-      }
+      try{ return await fetchJSON('/.netlify/functions/config'); }
+      catch{ return { locations: [], categories: [] }; }
     }
 
     function setSelect(sel, arr, label){
@@ -165,7 +179,6 @@
         </tr>
       `).join('') || `<tr><td colspan="10" class="small">No results.</td></tr>`;
 
-      // header visuals
       document.querySelectorAll('th.sortable').forEach(th=>{
         th.classList.toggle('sort-active', th.dataset.k===sortK);
         const arrow = th.querySelector('.arrow');
@@ -173,19 +186,36 @@
       });
     }
 
+    function warrantyNorm(s){
+      s=String(s||'').trim().toLowerCase();
+      if(s==='active'||s==='deactivated') return s[0].toUpperCase()+s.slice(1);
+      return 'Unknown';
+    }
+
     (async ()=>{
       const status = document.getElementById('status');
       try{
         const [d, c] = await Promise.all([loadData(), loadConfig()]);
-        data = Array.isArray(d)? d : (d.items||[]);  // support both shapes
+        data = Array.isArray(d)? d : (d.items||[]);
 
         if(!data.length){
           status.style.display='block';
           status.textContent = 'No inventory items were returned. If you just added data, refresh once more.';
         }
 
-        // Build chips with counts
+        // Build print header meta (totals)
         const byCat = groupBy(data,'category');
+        const byW   = groupBy(data, x => warrantyNorm(x.warranty_status));
+        const totals = [
+          `Total: ${data.length}`,
+          ...Object.keys(byCat).filter(Boolean).sort().map(k=>`${k}: ${(byCat[k]||[]).length}`),
+          ...Object.keys(byW).filter(Boolean).sort().map(k=>`${k}: ${(byW[k]||[]).length}`)
+        ].join(' • ');
+        const now = new Date();
+        document.getElementById('printMeta').textContent =
+          `${now.toLocaleDateString()} ${now.toLocaleTimeString()} — ${totals}`;
+
+        // Category chips (use configured order if present)
         const order = (c.categories && c.categories.length) ? c.categories : Object.keys(byCat);
         const chipsHost = document.getElementById('catChips');
         chipsHost.innerHTML = (order||[]).filter(Boolean)
