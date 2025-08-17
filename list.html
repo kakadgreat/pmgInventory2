@@ -2,124 +2,101 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Inventory Home</title>
+<title>All Inventory</title>
 <link rel="stylesheet" href="style.css"/>
-<!-- Chart.js (CDN) -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
 <header id="topbar" class="topbar">
   <div class="topbar-inner">
+    <a class="btn" href="index.html">Home</a>
     <a class="btn" href="list.html">List</a>
     <a class="btn" href="table.html">Table</a>
     <a class="btn" href="locations.html">Locations</a>
-    <strong style="margin-left:.5rem">Inventory Overview</strong>
+    <a class="btn" href="README.html">README</a>
   </div>
 </header>
 
 <main class="container">
-  <!-- CATEGORY OVERVIEW -->
   <section class="pill">
-    <h2 style="margin:0 0 .25rem 0">Inventory Overview</h2>
-    <div id="catChips" class="chips"></div>
-    <div class="chart-row">
-      <div class="chart-cell">
-        <div class="chart-card">
-          <canvas id="catChart" height="280"></canvas>
-          <div id="catLegend" class="chart-legend"></div>
-        </div>
-      </div>
+    <h2>All Inventory</h2>
+    <div class="row" style="gap:.5rem; flex-wrap:wrap; align-items:center">
+      <input id="q" type="search" placeholder="Search by model, user, serial, room…" />
+      <select id="loc"><option value="">All locations</option></select>
+      <select id="w"><option value="">Any warranty</option><option>Active</option><option>Deactivated</option></select>
     </div>
+    <div id="activeFilters" class="chips" style="margin-top:.35rem"></div>
   </section>
 
-  <!-- WARRANTY OVERVIEW -->
-  <section class="pill">
-    <h2 style="margin:0 0 .25rem 0">Warranty Overview</h2>
-    <div id="wChips" class="chips"></div>
-    <div class="chart-row">
-      <div class="chart-cell">
-        <div class="chart-card">
-          <canvas id="wChart" height="280"></canvas>
-          <div id="wLegend" class="chart-legend"></div>
-        </div>
-      </div>
-    </div>
-  </section>
+  <div id="grid" class="grid"></div>
 </main>
 
 <script>
 async function load(){ try{ const r=await fetch('/.netlify/functions/inventory',{cache:'no-store'}); if(r.ok) return await r.json(); }catch{} return []; }
-async function cfg(){ try{ const r=await fetch('/.netlify/functions/config'); if(r.ok) return await r.json(); }catch{} return { categories:["Desktops","Laptops","Phones","Other"] }; }
-
-const PALETTE=["#10b981","#60a5fa","#f59e0b","#ef4444","#a78bfa","#34d399","#f472b6","#f97316","#22d3ee","#84cc16"];
-
-function pie(ctx,labels,data){
-  const colors=labels.map((_,i)=>PALETTE[i%PALETTE.length]);
-  return new Chart(ctx,{ type:'pie', data:{ labels, datasets:[{ data, backgroundColor:colors, borderColor:'#fff', borderWidth:2 }]},
-    options:{ plugins:{ legend:{ display:false }}}});
+async function cfg(){ try{ const r=await fetch('/.netlify/functions/config'); if(r.ok) return await r.json(); }catch{} return { locations:[] }; }
+function set(sel, arr, label){
+  sel.innerHTML = label?`<option value="">${label}</option>`:'';
+  [...new Set(arr.filter(Boolean))].sort().forEach(v=>sel.insertAdjacentHTML('beforeend', `<option>${v}</option>`));
 }
-function renderLegend(host,labels){
-  host.innerHTML = labels.map((l,i)=>`<span><span class="legend-dot" style="background:${PALETTE[i%PALETTE.length]}"></span>${l}</span>`).join('');
-}
-function countsBy(list, keyFn){
-  const m=new Map();
-  list.forEach(x=>{ const k=keyFn(x)||'Unknown'; m.set(k,(m.get(k)||0)+1); });
-  return m;
-}
-function chips(host, items, counts, activeSet, onChange){
-  host.innerHTML = items.map(k=>{
-    const n=counts.get(k)||0;
-    return `<span class="chip ${activeSet.has(k)?'active':''}" data-k="${k}">${k} (${n})</span>`;
-  }).join('');
-  host.onclick = (e)=>{
-    const t=e.target.closest('[data-k]'); if(!t) return;
-    const k=t.dataset.k;
-    activeSet.has(k)?activeSet.delete(k):activeSet.add(k);
-    onChange();
-  };
+function getParam(k){ return new URLSearchParams(location.search).get(k)||''; }
+
+function card(x){
+  const w=(x.warranty_status||'').toLowerCase();
+  const wBadge = w ? `<span class="badge ${w==='active'?'ok':'bad'}">${x.warranty_status}</span>` : '';
+  const tags=[x.category,x.brand,x.model].filter(Boolean).map(t=>`<span class="badge">${t}</span>`).join(' ');
+  return `
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem">
+      <h3>${x.title||'-'}</h3>
+      <a class="btn" href="admin/edit.html?slug=${encodeURIComponent(x.slug||'')}">Edit</a>
+    </div>
+    <div class="row">${tags} ${wBadge}</div>
+    <div class="kv">
+      <div class="marker">User</div><div>${x.user||'-'}</div>
+      <div class="marker">Location</div><div>${x.location||'-'}</div>
+      <div class="marker">Room</div><div>${x.room||'-'}</div>
+      <div class="marker">Dept</div><div>${x.dept||'-'}</div>
+      <div class="marker">Asset / Serial</div><div>${[x.asset_tag,x.serial].filter(Boolean).join(' / ')||'-'}</div>
+      <div class="marker">Warranty Expires</div><div>${x.warranty_expires||'-'}</div>
+    </div>
+  </div>`;
 }
 
-(async()=>{
-  const [data, c] = await Promise.all([load(), cfg()]);
+(async ()=>{
+  const [data, conf] = await Promise.all([load(), cfg()]);
+  const grid=document.getElementById('grid');
+  const q=document.getElementById('q');
+  const loc=document.getElementById('loc');
+  const w=document.getElementById('w');
+  set(loc, conf.locations?.length?conf.locations:data.map(x=>x.location), 'All locations');
 
-  // ----- CATEGORY -----
-  const byCat = countsBy(data, x=>x.category);
-  const catOrder = (c.categories?.length?c.categories:Array.from(byCat.keys()));
-  const activeCats=new Set(); // multi-select; empty = all
-  const catChipsHost=document.getElementById('catChips');
-  const catCtx=document.getElementById('catChart').getContext('2d');
-  const catLegend=document.getElementById('catLegend');
-  let catChart;
+  // If coming from Home pills: prefilter by ?category=
+  const presetCat = getParam('category').toLowerCase();
 
-  function drawCat(){
-    const labels = (activeCats.size?catOrder.filter(k=>activeCats.has(k)):catOrder).filter(Boolean);
-    const vals = labels.map(k=>byCat.get(k)||0);
-    if(catChart) catChart.destroy();
-    catChart = pie(catCtx, labels, vals);
-    renderLegend(catLegend, labels);
-    chips(catChipsHost, catOrder, byCat, activeCats, drawCat);
+  function run(){
+    const text=(q.value||'').toLowerCase();
+    const lsel=loc.value||'';
+    const wsel=w.value||'';
+
+    let list = data;
+    if(presetCat) list=list.filter(x=>String(x.category||'').toLowerCase()===presetCat);
+    if(lsel) list=list.filter(x=>(x.location||'')===lsel);
+    if(wsel) list=list.filter(x=>String(x.warranty_status||'').toLowerCase()===wsel.toLowerCase());
+    if(text){
+      list=list.filter(x=>(`${x.title} ${x.brand} ${x.model} ${x.serial} ${x.asset_tag} ${x.location} ${x.room} ${x.dept} ${x.user}`.toLowerCase().includes(text)));
+    }
+
+    grid.innerHTML = list.map(card).join('') || `<div class="small" style="padding:.5rem 0">No results.</div>`;
+
+    // Show tiny “active filter” chips
+    const af=document.getElementById('activeFilters');
+    af.innerHTML = [
+      presetCat?`<span class="chip active">Category: ${decodeURIComponent(getParam('category'))}</span>`:'',
+      lsel?`<span class="chip active">Location: ${lsel}</span>`:'',
+      wsel?`<span class="chip active">Warranty: ${wsel}</span>`:''
+    ].filter(Boolean).join('');
   }
-  drawCat();
-
-  // ----- WARRANTY -----
-  function normW(s){ s=String(s||'').trim().toLowerCase(); if(s==='active'||s==='deactivated') return s[0].toUpperCase()+s.slice(1); return 'Unknown'; }
-  const byW = countsBy(data, x=>normW(x.warranty_status));
-  const wOrder = ['Active','Deactivated','Unknown'].filter(k=>byW.has(k));
-  const activeW=new Set();
-  const wChipsHost=document.getElementById('wChips');
-  const wCtx=document.getElementById('wChart').getContext('2d');
-  const wLegend=document.getElementById('wLegend');
-  let wChart;
-
-  function drawW(){
-    const labels = (activeW.size?wOrder.filter(k=>activeW.has(k)):wOrder);
-    const vals = labels.map(k=>byW.get(k)||0);
-    if(wChart) wChart.destroy();
-    wChart = pie(wCtx, labels, vals);
-    renderLegend(wLegend, labels);
-    chips(wChipsHost, wOrder, byW, activeW, drawW);
-  }
-  drawW();
+  [q,loc,w].forEach(el=>el.addEventListener('input',run));
+  run();
 })();
 </script>
 </body>
