@@ -118,3 +118,26 @@ input.active-filter::placeholder { color:#065f46; opacity:.6; }
 .chip.active{ background:#ecfdf5; border-color:#10b981; color:#065f46; }
 
 /* filters*
+
+/* --- Inventory Admin layout helpers --- */
+.screenfill{ min-height: calc(100vh - 72px); display:flex; flex-direction:column; }
+.zones{ display:grid; gap:14px; grid-template-columns:repeat(12, minmax(0,1fr)); }
+.zone{ grid-column:span 12 / span 12; background:#f9fafb; border:1px solid var(--line); border-radius:12px; padding:14px; }
+@media (min-width: 900px){ .zone.half{ grid-column:span 6 / span 6; } .zone.third{ grid-column:span 4 / span 4; } }
+.zone h2{ font-size:1rem; margin:.1rem 0 .6rem 0; color:#374151; }
+.zone .grid2{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+@media (max-width:720px){ .zone .grid2{ grid-template-columns:1fr; } }
+.sticky-actions{
+  position:sticky; bottom:0; margin-top:auto;
+  background:linear-gradient(180deg, rgba(247,247,251,0) 0%, #fff 30%); padding:12px 0 6px 0;
+  border-top:1px solid var(--line);
+}
+.table-wrap{ background:#fff; border:1px solid var(--line); border-radius:12px; overflow:auto; }
+.table{ width:100%; border-collapse:separate; border-spacing:0; min-width:940px; }
+.table thead th{
+  position:sticky; top:0; background:#f9fafb; border-bottom:1px solid var(--line);
+  text-align:left; font-weight:600; padding:.65rem .6rem; white-space:nowrap;
+}
+.table tbody td{ border-bottom:1px solid #f1f5f9; padding:.55rem .6rem; }
+.table tbody tr:hover{ background:#fcfdfc; }
+.row-link{ color:inherit; text-decoration:none; display:block; }
