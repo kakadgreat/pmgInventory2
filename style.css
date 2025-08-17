@@ -202,3 +202,15 @@ th.sort-active .arrow{ opacity:1; }
   border-top: 1px solid var(--line);
 }
 .sticky-actions .right{ display:flex; gap:.5rem; justify-content:flex-end; }
+
+
+/* Chips already exist; add chart layout helpers */
+.chart-row{ display:grid; gap:12px; grid-template-columns:repeat(12,minmax(0,1fr)); }
+.chart-cell{ grid-column:span 6 / span 6; }
+@media (max-width:900px){ .chart-cell{ grid-column:span 12 / span 12; } }
+.chart-card{ background:#fff; border:1px solid var(--line); border-radius:12px; padding:12px; }
+.chart-legend{ display:flex; flex-wrap:wrap; gap:.4rem .6rem; margin-top:.5rem; }
+.legend-dot{ width:.75rem; height:.75rem; border-radius:999px; display:inline-block; margin-right:.35rem; }
+
+/* print: keep charts off the page */
+@media print{ .chart-card, canvas { display:none !important; } }
