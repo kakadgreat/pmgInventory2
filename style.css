@@ -141,3 +141,14 @@ input.active-filter::placeholder { color:#065f46; opacity:.6; }
 .table tbody td{ border-bottom:1px solid #f1f5f9; padding:.55rem .6rem; }
 .table tbody tr:hover{ background:#fcfdfc; }
 .row-link{ color:inherit; text-decoration:none; display:block; }
+
+/* --- Admin polish --- */
+.zone textarea{ width:100%; }
+.btn.sm{ padding:.3rem .55rem; font-size:.85rem; }
+
+/* Table sorting */
+th.sortable{ cursor:pointer; user-select:none; }
+th.sort-active{ background:#ecfdf5 !important; color:#065f46; border-bottom-color:#10b981 !important; }
+th .arrow{ opacity:.45; margin-left:.25rem; }
+th.sort-active .arrow{ opacity:1; }
+
