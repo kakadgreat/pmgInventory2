@@ -81,10 +81,14 @@
       <textarea name="notes" rows="3" placeholder="Any special instructions or history"></textarea>
     </section>
 
+    <!-- sticky actions, matched to Edit page -->
     <section class="sticky-actions">
-      <div class="row" style="justify-content:flex-end">
-        <a class="btn" href="../list.html">Cancel</a>
-        <button class="btn primary" type="submit">Save Item</button>
+      <div class="row" style="justify-content:space-between">
+        <span></span>
+        <div class="row">
+          <a class="btn" href="../list.html">Back</a>
+          <button class="btn primary" type="submit">Save Item</button>
+        </div>
       </div>
       <div id="msg" class="small" style="margin-top:.25rem"></div>
     </section>
@@ -107,7 +111,6 @@ f.addEventListener('submit', async (e)=>{
   e.preventDefault();
   const o=Object.fromEntries(new FormData(f).entries());
   Object.keys(o).forEach(k=>{ if(o[k]==='') delete o[k]; });
-  // generate slug from title + serial/asset
   const base = (o.title||'').toLowerCase().replace(/[^\w]+/g,'-');
   const tail = (o.serial||o.asset_tag||'').toLowerCase().replace(/[^\w]+/g,'-');
   o.slug = `${base}-${tail}`.replace(/(^-|-$)/g,'') || `item-${Date.now()}`;
