@@ -3,193 +3,167 @@
 <head>
 <meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>Phone Directory</title>
-<link rel="stylesheet" href="style.css"/>
+<link rel="stylesheet" href="/style.css"/>
 <style>
-  .note{padding:.6rem .8rem;border:1px solid #e5e7eb;border-radius:10px;background:#f9fafb;color:#374151}
-  .chip.sm{padding:.2rem .55rem;font-size:.85rem}
-  .chips-scroll{display:flex;gap:.4rem;overflow:auto;padding-bottom:.25rem}
-  .chips-scroll::-webkit-scrollbar{height:6px}
-  .chips-scroll::-webkit-scrollbar-thumb{background:#e5e7eb;border-radius:999px}
+  .wrap{max-width:1180px;margin:0 auto;padding:24px}
+  .toolbar{background:#f7f8fb;border:1px solid #eef0f4;border-radius:12px;padding:12px;display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+  .toolbar input[type=search]{flex:1 1 280px}
+  .select{appearance:none;border:1px solid #e6e9ef;border-radius:10px;padding:.55rem .9rem;background:#fff}
+  .chips{display:flex;gap:8px;flex-wrap:wrap}
+  .chip{border:1px solid #e6e9ef;background:#fff;border-radius:999px;padding:.35rem .7rem;font-size:.875rem;cursor:pointer}
+  .chip.on{background:#eaffef;border-color:#2ecc71;color:#2a7f4f}
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:14px;margin-top:14px}
+  .card{background:#fff;border:1px solid #eef0f4;border-radius:12px;padding:14px}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .pill{display:inline-block;border:1px solid #e6e9ef;border-radius:999px;padding:.15rem .55rem;font-size:.75rem;background:#fff;margin-right:6px}
+  .status{border-radius:999px;padding:.15rem .5rem;font-size:.75rem;border:1px solid #e6e9ef;background:#fff}
+  .status.Active{background:#eaffef;border-color:#2ecc71;color:#2a7f4f}
+  .status.Deactivated,.status.Inactive{background:#ffecec;border-color:#ffb3b3;color:#b33434}
+  .btn{border:1px solid #e6e9ef;background:#fff;border-radius:10px;padding:.45rem .75rem;cursor:pointer}
+  .btn:hover{background:#f6f8fc}
+  .meta{font-size:.87rem;color:#404553}
+  .note{font-size:.8rem;color:#6b7280;margin-top:6px}
 </style>
 </head>
 <body>
-<header id="topbar" class="topbar">
-  <div class="topbar-inner">
-    <!-- Intentionally no Home link so you can share this page -->
-    <span class="badge">Phone Directory</span>
+<div class="wrap">
+  <h1 style="margin:0 0 10px">Phone Directory</h1>
+
+  <div class="toolbar">
+    <input id="q" type="search" placeholder="Search name, extension, role, email…"/>
+    <select id="loc" class="select"><option value="">All locations</option></select>
+    <select id="status" class="select"><option value="">Any status</option><option>Active</option><option>Inactive</option><option>Deactivated</option></select>
+    <div id="teamChips" class="chips" aria-label="Team filters"></div>
   </div>
-</header>
 
-<main class="container">
-  <section class="pill">
-    <div class="row" style="gap:.5rem;flex-wrap:wrap;align-items:center">
-      <input id="q" type="search" placeholder="Search name, extension, role, team, email, location…"/>
-      <select id="loc" style="max-width:220px"><option value="">All locations</option></select>
-      <select id="status" style="max-width:180px"><option value="">Any status</option><option>Active</option><option>Deactivated</option></select>
-    </div>
-
-    <!-- Quick team slicers (multi-select pills) -->
-    <div id="teamChips" class="chips chips-scroll" style="margin-top:.5rem"></div>
-
-    <div id="statusMsg" class="note" style="display:none;margin-top:.5rem"></div>
-  </section>
-
-  <div id="grid" class="grid"></div>
-</main>
+  <div id="debug" class="note" style="margin:8px 2px;"></div>
+  <div id="results" class="cards" role="list"></div>
+</div>
 
 <script>
-/* ------------ helpers ------------ */
-async function fetchJSON(url){
-  const r = await fetch(url, {cache:'no-store'});
-  if(!r.ok) throw new Error('HTTP '+r.status);
-  return await r.json();
-}
-function distinct(arr){return [...new Set(arr.filter(Boolean))]}
-function setOptions(sel, arr, label){
-  sel.innerHTML = label?`<option value="">${label}</option>`:'';
-  distinct(arr).sort().forEach(v => sel.insertAdjacentHTML('beforeend', `<option>${v}</option>`));
-}
-function ucfirst(s){s=String(s||'');return s? s[0].toUpperCase()+s.slice(1):s;}
-function normStatus(v){
-  if (v===true || String(v).toLowerCase()==='true') return 'Active';
-  const s = String(v||'').toLowerCase();
-  if (s==='active') return 'Active';
-  if (['inactive','deactivated','disabled'].includes(s)) return 'Deactivated';
-  return ucfirst(v||'');
-}
-function normalizeRow(p){
-  const name = p.name || p.full_name || p.displayName || p.user || '';
-  const ext  = p.extension || p.ext || p.exten || p.ext_no || p.extention || '';
-  const direct = p.direct || p.direct_line || p.directLine || '';
-  const mobile = p.mobile || p.cell || p.phone || '';
-  const email  = p.email || p.mail || '';
-  const location = p.location || p.site || p.office || p.locationName || '';
-  const role   = p.role || p.title || p.position || '';
-  const status = normStatus(p.status ?? p.active);
+(async function(){
+  const TEAM_CANON = ['PROVIDERS','FRONT OFFICE','BILLING','ADMINISTRATION','MA','PEDIATRICS','SPA','CALL CENTER','IT','LEADERSHIP'];
 
-  let team = p.team ?? p.teams ?? '';
-  if (Array.isArray(team)) team = team.join(', ');
-  if (typeof team === 'string') team = team.replace(/[|;]+/g, ', ').replace(/\s*,\s*/g, ', ').trim();
+  const els={q:document.getElementById('q'),loc:document.getElementById('loc'),status:document.getElementById('status'),
+             teamChips:document.getElementById('teamChips'),debug:document.getElementById('debug'),results:document.getElementById('results')};
 
-  return { name, extension: String(ext||'').trim(), direct, mobile, email, location, team, role, status };
-}
-function card(p){
-  const tags=[p.team,p.location,p.status].filter(Boolean).map(t=>`<span class="badge">${t}</span>`).join(' ');
-  const call = p.extension?`<a class="btn sm" href="tel:${p.extension}">Call</a>`:'';
-  const mail = p.email?`<a class="btn sm" href="mailto:${p.email}">Email</a>`:'';
-  return `
-  <div class="card">
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem">
-      <h3>${p.name||'-'}</h3>
-      <div>${tags}</div>
-    </div>
-    <div class="kv">
-      <div class="marker">Extension</div><div>${p.extension||'-'}</div>
-      <div class="marker">Direct</div><div>${p.direct||'-'}</div>
-      <div class="marker">Mobile</div><div>${p.mobile||'-'}</div>
-      <div class="marker">Email</div><div>${p.email||'-'}</div>
-      <div class="marker">Location</div><div>${p.location||'-'}</div>
-      <div class="marker">Role</div><div>${p.role||'-'}</div>
-    </div>
-    <div class="row" style="gap:.5rem;margin-top:.5rem">${call}${mail}</div>
-  </div>`;
-}
-function getParam(k){ return new URLSearchParams(location.search).get(k)||''; }
+  const params=new URLSearchParams(location.search);
+  const forceDb = (params.get('source')||'').toLowerCase()==='db';
 
-/* ---------- robust loader (phones.json first, then functions) ---------- */
-async function loadPhones(){
-  const candidates = [
-    '/phones.json',                           // you confirmed this exists
-    '/.netlify/functions/phone_quick',        // your quick page likely uses this
+  async function fetchJSON(u){const r=await fetch(u,{cache:'no-store'});if(!r.ok)throw new Error(u+': '+r.status);return r.json();}
+
+  // Prefer your DB function first (the one used by /phone_quick.html)
+  const functionFirst = [
+    '/.netlify/functions/phone_quick',
     '/.netlify/functions/phones',
-    '/.netlify/functions/phone',
-    '/data/phones.json'
+    '/.netlify/functions/phone'
   ];
-  const tried = [];
+  const fileFallback = ['/phones.json','/data/phones.json'];
+
+  const candidates = forceDb ? functionFirst : [...functionFirst, ...fileFallback];
+
+  let raw=[], source=null, tried=[];
   for (const u of candidates){
     try{
       const j = await fetchJSON(u);
-      let rows = [];
-      if (Array.isArray(j)) rows = j;
-      else if (Array.isArray(j.items)) rows = j.items;
-      else if (Array.isArray(j.records)) rows = j.records;
-      else if (Array.isArray(j.rows)) rows = j.rows;
-      else if (Array.isArray(j.data)) rows = j.data;
-      else { tried.push(`${u} (unrecognized shape)`); continue; }
-
-      if (rows.length){
-        return {items: rows.map(normalizeRow).filter(x=>x.name||x.extension||x.email), source:u, tried};
-      }
+      const rows = Array.isArray(j) ? j :
+                   Array.isArray(j.items) ? j.items :
+                   Array.isArray(j.records) ? j.records :
+                   Array.isArray(j.rows) ? j.rows :
+                   Array.isArray(j.data) ? j.data : [];
+      if(rows.length){ raw=rows; source=u; break; }
       tried.push(`${u} (empty)`);
     }catch(e){ tried.push(`${u} (error)`); }
   }
-  return {items:[], source:null, tried};
-}
 
-/* ---------------- main ---------------- */
-(async()=>{
-  const {items, source, tried} = await loadPhones();
-
-  const grid   = document.getElementById('grid');
-  const q      = document.getElementById('q');
-  const loc    = document.getElementById('loc');
-  const status = document.getElementById('status');
-  const teamChips = document.getElementById('teamChips');
-  const statusMsg = document.getElementById('statusMsg');
-
-  if(!items.length){
-    statusMsg.style.display='block';
-    statusMsg.innerHTML = `<strong>No phone data found.</strong><br/><span style="color:#6b7280">Tried: ${tried.join(' → ')}</span>`;
+  if(!raw.length){
+    els.debug.textContent = `No phone data found. Tried: ${tried.join(' → ')}`;
     return;
   }
 
-  // Build filters
-  setOptions(loc, items.map(p=>p.location), 'All locations');
-
-  // Team chips: use your canonical list so it’s short & tidy
-  const TEAM_LIST = ["PROVIDERS","FRONT OFFICE","BILLING","ADMINISTRATION","MA","PEDIATRICS","SPA","CALL CENTER","IT","LEADERSHIP"];
-  const presentTeams = distinct(items.flatMap(p => (p.team||'').split(',').map(s=>s.trim()).filter(Boolean)));
-  const teams = TEAM_LIST.filter(t => presentTeams.includes(t)).concat(presentTeams.filter(t => !TEAM_LIST.includes(t)));
-  const selectedTeams = new Set();
-  teamChips.innerHTML = teams.map(t=>`<span class="chip sm" data-team="${t}">${t}</span>`).join('');
-  teamChips.addEventListener('click', e=>{
-    const c=e.target.closest('[data-team]'); if(!c) return;
-    const t=c.dataset.team;
-    if(selectedTeams.has(t)) selectedTeams.delete(t); else selectedTeams.add(t);
-    c.classList.toggle('active');
-    run();
+  // Normalization
+  const normStatus=v=>{
+    const s=String(v??'').toLowerCase();
+    if (v===true||s==='true'||s==='active') return 'Active';
+    if (['inactive','deactivated','disabled','false'].includes(s)) return 'Deactivated';
+    return (v||'').toString();
+  };
+  const canonTeamsFor=(raw)=>{
+    const t=(raw||'').toUpperCase(); const out=new Set();
+    TEAM_CANON.forEach(c=>{if(t.includes(c)) out.add(c);});
+    if(t.includes('PEDIATRIC')) out.add('PEDIATRICS');
+    if(t.includes('MESSAGE PRO')) out.add('CALL CENTER');
+    if(t.includes('ADMIN')) out.add('ADMINISTRATION');
+    if(t.includes(' MA')) out.add('MA');
+    return [...out];
+  };
+  const data = raw.map(p=>{
+    return {
+      name: p.name||p.full_name||p.displayName||p.user||'',
+      extension: String(p.extension||p.ext||p.exten||'').trim(),
+      direct_phone: p.direct||p.direct_line||'',
+      mobile: p.mobile||p.cell||'',
+      email: p.email||'',
+      location: p.location||p.site||'',
+      role: p.role||p.title||'',
+      status: normStatus(p.status ?? p.active),
+      _teams: canonTeamsFor(p.team||p.teams||'')
+    };
   });
 
-  // Show source
-  statusMsg.style.display='block';
-  statusMsg.textContent = `Loaded ${items.length} entries from ${source}.`;
+  els.debug.textContent = `Loaded ${data.length} entries from ${source}`;
 
-  // Pre-set search from ?q=
-  const preset = (getParam('q')||'').trim();
-  if(preset){ q.value=preset; }
+  // build locations
+  [...new Set(data.map(d=>d.location).filter(Boolean))].sort()
+    .forEach(l=>{const o=document.createElement('option');o.value=o.textContent=l;els.loc.appendChild(o);});
 
-  function run(){
-    const text=(q.value||'').toLowerCase();
-    const lsel=loc.value||'';
-    const ssel=status.value||'';
-    let list = items;
+  // team chips
+  const selected=new Set();
+  TEAM_CANON.forEach(t=>{
+    const btn=document.createElement('button'); btn.type='button'; btn.className='chip'; btn.textContent=t;
+    btn.onclick=()=>{ if(selected.has(t)){selected.delete(t);btn.classList.remove('on');} else {selected.add(t);btn.classList.add('on');} render(); };
+    els.teamChips.appendChild(btn);
+  });
 
-    if(text){
-      list = list.filter(p => (`${p.name} ${p.extension} ${p.email} ${p.location} ${p.team} ${p.role}`.toLowerCase().includes(text)));
-    }
-    if(lsel) list = list.filter(p => (p.location||'')===lsel);
-    if(ssel) list = list.filter(p => String(p.status||'').toLowerCase()===ssel.toLowerCase());
-    if(selectedTeams.size){
-      list = list.filter(p => {
-        const pt = (p.team||'').split(',').map(s=>s.trim());
-        return [...selectedTeams].some(t => pt.includes(t));
-      });
-    }
-
-    grid.innerHTML = list.map(card).join('') || `<div class="small" style="padding:.5rem 0">No results.</div>`;
+  function match(r){
+    const text=(els.q.value||'').toLowerCase(), loc=els.loc.value, st=els.status.value;
+    if(text && !(`${r.name} ${r.extension} ${r.email} ${r.location} ${r.role}`.toLowerCase().includes(text))) return false;
+    if(loc && r.location!==loc) return false;
+    if(st && (r.status||'').toLowerCase()!==st.toLowerCase()) return false;
+    if(selected.size && ![...selected].every(t=>r._teams.includes(t))) return false;
+    return true;
   }
-  [q,loc,status].forEach(el=>el.addEventListener('input',run));
-  run();
+
+  function statusBadge(s){const cls=(''+s).replace(/\s+/g,''); return `<span class="status ${cls}">${s||'-'}</span>`;}
+  function card(r){
+    const teams = r._teams.map(t=>`<span class="pill">${t}</span>`).join(' ');
+    return `<div class="card" role="listitem">
+      <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;">
+        <div class="meta"><strong>${r.name||'-'}</strong></div>${statusBadge(r.status)}
+      </div>
+      <div class="note" style="margin:6px 0 8px">${teams||''}</div>
+      <div class="row">
+        <div>
+          <div class="meta"><b>Extension</b><br>${r.extension||'-'}</div>
+          <div class="meta"><b>Direct</b><br>${r.direct_phone||'-'}</div>
+          <div class="meta"><b>Mobile</b><br>${r.mobile||'-'}</div>
+        </div>
+        <div>
+          <div class="meta"><b>Email</b><br>${r.email||'-'}</div>
+          <div class="meta"><b>Location</b><br>${r.location||'-'}</div>
+          <div class="meta"><b>Role</b><br>${r.role||'-'}</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        ${r.extension?`<a class="btn" href="tel:${r.extension}">Call</a>`:''}
+        ${r.email?`<a class="btn" href="mailto:${r.email}">Email</a>`:''}
+      </div>
+    </div>`;
+  }
+
+  function render(){ els.results.innerHTML = data.filter(match).map(card).join('') || `<div class="note">No results.</div>`; }
+  ['input','change'].forEach(ev=>{els.q.addEventListener(ev,render);els.loc.addEventListener(ev,render);els.status.addEventListener(ev,render);});
+  render();
 })();
 </script>
 </body>
