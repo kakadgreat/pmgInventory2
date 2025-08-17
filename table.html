@@ -1,152 +1,176 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Inventory Table</title>
-<link rel="stylesheet" href="style.css"/>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Inventory Table</title>
+  <link rel="stylesheet" href="style.css"/>
+
+  <!-- Small page-local helpers so this file works even if CSS tweaks are missing -->
+  <style>
+    /* put Add/Print on the top-right nicely */
+    .actions-right{ display:flex; gap:.5rem; align-items:center; }
+    /* light-blue buttons (will be overridden by your global .btn styles if present) */
+    .btn.blue{ background:#e0f2fe; border:1px solid #bae6fd; color:#075985; }
+    .btn.blue:hover{ filter:brightness(.98); }
+    /* make sortable headers clickable */
+    th.sortable{ cursor:pointer; user-select:none; }
+    th .arrow{ opacity:.45; margin-left:.25rem; }
+    th.sort-active{ background:#ecfdf5; color:#065f46; border-bottom-color:#10b981 !important; }
+    th.sort-active .arrow{ opacity:1; }
+    /* hide Actions column when printing; repeat header each page */
+    @media print{
+      .col-actions{ display:none !important; }
+      table thead{ display:table-header-group; }
+    }
+  </style>
 </head>
 <body>
-<header id="topbar" class="topbar">
-  <div class="topbar-inner">
-    <a class="btn" href="index.html">← Home</a>
-    <a class="btn" href="list.html">Cards</a>
-    <strong style="margin-left:.5rem">Inventory Table</strong>
-  </div>
-</header>
-
-<main class="container screenfill">
-  <!-- Overview pills with counts (clickable / multi-select) -->
-  <section class="pill">
-    <h2 style="margin:0 0 .25rem 0">Inventory Overview</h2>
-    <div id="catChips" class="chips"></div>
-
-    <div class="filters">
-      <input id="q" type="search" placeholder="Search title, serial, brand, location…" />
-      <select id="loc"><option value="">All locations</option></select>
-      <select id="w"><option value="">Any warranty</option><option>Active</option><option>Deactivated</option></select>
+  <header id="topbar" class="topbar">
+    <div class="topbar-inner">
+      <a class="btn" href="index.html">Home</a>
+      <a class="btn" href="list.html">List</a>
+      <a class="btn" href="table.html">Table</a>
+      <a class="btn" href="locations.html">Locations</a>
     </div>
+  </header>
 
-    <div class="row">
-      <a class="btn" href="admin/add">+ Add</a>
-      <button class="btn print-hide" onclick="window.print()">Print</button>
-    </div>
-  </section>
+  <main class="container screenfill">
+    <!-- Controls + overview chips -->
+    <section class="pill">
+      <h2 style="margin:0 0 .25rem 0">Inventory Overview</h2>
 
-  <section class="table-wrap">
-    <table class="table" id="t">
-      <thead id="th">
+      <!-- Category chips with counts (multi-select) -->
+      <div id="catChips" class="chips" style="margin-bottom:.25rem"></div>
+
+      <!-- Filters left, actions right -->
+      <div class="row" style="justify-content:space-between; gap:.5rem; flex-wrap:wrap; align-items:center">
+        <div class="row" style="gap:.5rem; flex-wrap:wrap">
+          <input id="q" type="search" placeholder="Search title, serial, brand, location…" />
+          <select id="loc"><option value="">All locations</option></select>
+          <select id="w">
+            <option value="">Any warranty</option>
+            <option>Active</option>
+            <option>Deactivated</option>
+          </select>
+        </div>
+
+        <div class="actions-right">
+          <a class="btn blue" href="admin/add">+ Add</a>
+          <button class="btn blue" onclick="window.print()">Print</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Data table -->
+    <section class="table-wrap">
+      <table class="table" id="t">
+        <thead id="th">
+          <tr>
+            <th class="sortable" data-k="category">Category <span class="arrow">↕</span></th>
+            <th class="sortable" data-k="brand">Brand <span class="arrow">↕</span></th>
+            <th class="sortable" data-k="title">Title <span class="arrow">↕</span></th>
+            <th class="sortable" data-k="serial">Serial <span class="arrow">↕</span></th>
+            <th class="sortable" data-k="location">Location <span class="arrow">↕</span></th>
+            <th class="sortable" data-k="room">Room <span class="arrow">↕</span></th>
+            <th class="sortable" data-k="dept">Dept <span class="arrow">↕</span></th>
+            <th class="sortable" data-k="warranty_status">Warranty status <span class="arrow">↕</span></th>
+            <th class="sortable" data-k="warranty_expires">Warranty expires <span class="arrow">↕</span></th>
+            <th class="col-actions">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="tb"></tbody>
+      </table>
+    </section>
+  </main>
+
+  <script>
+    // ----- Data helpers -----
+    const FALLBACK_LOCATIONS = [
+      "Jasper Primary Care","Jasper Pediatrics","Jasper MedSpa",
+      "Roswell Primary Care","Roswell MedSpa",
+      "Canton Primary Care","Canton Pediatrics","Canton MedSpa",
+      "Rome Primary Care","Rome MedSpa"
+    ];
+
+    async function cfg(){
+      try{
+        const r = await fetch('/.netlify/functions/config');
+        if(r.ok) return await r.json();
+      }catch(e){}
+      return { categories:["Desktops","Laptops","Phones","Printers","Scanners","Other"], locations:FALLBACK_LOCATIONS };
+    }
+    async function load(){
+      try{
+        const r = await fetch('/.netlify/functions/inventory', {cache:'no-store'});
+        if(r.ok) return await r.json();
+      }catch(e){}
+      return [];
+    }
+    function setSelect(sel, arr, label){
+      sel.innerHTML = label?`<option value="">${label}</option>`:'';
+      [...new Set(arr.filter(Boolean))].sort()
+        .forEach(v => sel.insertAdjacentHTML('beforeend', `<option>${v}</option>`));
+    }
+    function groupBy(xs, k){
+      return xs.reduce((a,x)=>((a[x[k]||'']=(a[x[k]||'']||[]).concat(x)),a),{});
+    }
+
+    // ----- Page logic -----
+    let data = [];
+    let sortK = 'title';
+    let sortDir = 'asc';
+    const activeCats = new Set(); // multi-select chips
+
+    function cmp(a,b,k){
+      const av=(a[k]??'').toString().toLowerCase();
+      const bv=(b[k]??'').toString().toLowerCase();
+      if(av<bv) return -1; if(av>bv) return 1; return 0;
+    }
+    function sortList(list){
+      const s=[...list].sort((a,b)=>cmp(a,b,sortK));
+      return sortDir==='asc'?s:s.reverse();
+    }
+
+    function drawTable(list){
+      const tb = document.getElementById('tb');
+      tb.innerHTML = list.map(x=>`
         <tr>
-          <th class="sortable" data-k="category">Category <span class="arrow">↕</span></th>
-          <th class="sortable" data-k="brand">Brand <span class="arrow">↕</span></th>
-          <th class="sortable" data-k="title">Title <span class="arrow">↕</span></th>
-          <th class="sortable" data-k="serial">Serial <span class="arrow">↕</span></th>
-          <th class="sortable" data-k="location">Location <span class="arrow">↕</span></th>
-          <th class="sortable" data-k="room">Room <span class="arrow">↕</span></th>
-          <th class="sortable" data-k="dept">Dept <span class="arrow">↕</span></th>
-          <th class="sortable" data-k="warranty_status">Warranty status <span class="arrow">↕</span></th>
-          <th class="sortable" data-k="warranty_expires">Warranty expires <span class="arrow">↕</span></th>
-          <th class="col-actions">Actions</th>
+          <td>${x.category||'-'}</td>
+          <td>${x.brand||'-'}</td>
+          <td><a class="row-link" href="admin/edit.html?slug=${encodeURIComponent(x.slug||'')}">${x.title||'-'}</a></td>
+          <td>${x.serial||'-'}</td>
+          <td>${x.location||'-'}</td>
+          <td>${x.room||'-'}</td>
+          <td>${x.dept||'-'}</td>
+          <td>${x.warranty_status||'-'}</td>
+          <td>${x.warranty_expires||'-'}</td>
+          <td class="col-actions"><a class="btn sm" href="admin/edit.html?slug=${encodeURIComponent(x.slug||'')}">Edit</a></td>
         </tr>
-      </thead>
-      <tbody id="tb"></tbody>
-    </table>
-  </section>
-</main>
+      `).join('') || `<tr><td colspan="10" class="small">No results.</td></tr>`;
 
-<script>
-const FALLBACK_LOCATIONS=["Jasper Primary Care","Jasper Pediatrics","Jasper MedSpa","Roswell Primary Care","Roswell MedSpa","Canton Primary Care","Canton Pediatrics","Canton MedSpa","Rome Primary Care","Rome MedSpa"];
-async function cfg(){ try{ const r=await fetch('/.netlify/functions/config'); if(r.ok) return await r.json(); }catch{} return { categories:["Desktops","Laptops","Phones","Other"], locations:FALLBACK_LOCATIONS }; }
-async function load(){ try{ const r=await fetch('/.netlify/functions/inventory',{cache:'no-store'}); if(r.ok) return await r.json(); }catch{} return []; }
-function set(sel, arr, label){ sel.innerHTML=label?`<option value="">${label}</option>`:''; [...new Set(arr.filter(Boolean))].sort().forEach(v=>sel.insertAdjacentHTML('beforeend', `<option>${v}</option>`)); }
-function groupBy(xs,k){ return xs.reduce((a,x)=>((a[x[k]||'']=(a[x[k]||'']||[]).concat(x)),a),{}); }
+      // header arrows + highlight
+      document.querySelectorAll('th.sortable').forEach(th=>{
+        th.classList.toggle('sort-active', th.dataset.k===sortK);
+        const arrow = th.querySelector('.arrow');
+        if(arrow) arrow.textContent = th.dataset.k===sortK ? (sortDir==='asc'?'▲':'▼') : '↕';
+      });
+    }
 
-let data=[], sortK='title', sortDir='asc';
-const activeCats=new Set();
+    (async ()=>{
+      const [d, c] = await Promise.all([load(), cfg()]);
+      data = d;
 
-function compare(a,b,k){
-  const av=(a[k]??'').toString().toLowerCase();
-  const bv=(b[k]??'').toString().toLowerCase();
-  if(av<bv) return -1; if(av>bv) return 1; return 0;
-}
-function sortData(list){
-  const s=[...list].sort((a,b)=>compare(a,b,sortK));
-  return sortDir==='asc'?s:s.reverse();
-}
-function chip(label,count,active){ return `<span class="chip ${active?'active':''}" data-cat="${label}">${label} (${count})</span>`; }
-
-function drawTable(list){
-  const tb=document.getElementById('tb');
-  tb.innerHTML = list.map(x=>`
-    <tr>
-      <td>${x.category||'-'}</td>
-      <td>${x.brand||'-'}</td>
-      <td><a class="row-link" href="admin/edit.html?slug=${encodeURIComponent(x.slug||'')}">${x.title||'-'}</a></td>
-      <td>${x.serial||'-'}</td>
-      <td>${x.location||'-'}</td>
-      <td>${x.room||'-'}</td>
-      <td>${x.dept||'-'}</td>
-      <td>${x.warranty_status||'-'}</td>
-      <td>${x.warranty_expires||'-'}</td>
-      <td class="col-actions"><a class="btn sm" href="admin/edit.html?slug=${encodeURIComponent(x.slug||'')}">Edit</a></td>
-    </tr>
-  `).join('') || `<tr><td colspan="10" class="small">No results.</td></tr>`;
-
-  // header highlight + arrows
-  document.querySelectorAll('th.sortable').forEach(th=>{
-    th.classList.toggle('sort-active', th.dataset.k===sortK);
-    const arrow = th.querySelector('.arrow');
-    if(arrow) arrow.textContent = th.dataset.k===sortK ? (sortDir==='asc'?'▲':'▼') : '↕';
-  });
-}
-
-(async () => {
-  const [d, c] = await Promise.all([load(), cfg()]);
-  data = d;
-
-  // build overview chips with counts
-  const byCat = groupBy(data,'category');
-  const catOrder = (c.categories?.length?c.categories:Object.keys(byCat));
-  const chipsHost = document.getElementById('catChips');
-  chipsHost.innerHTML = catOrder.map(cat => chip(cat, (byCat[cat]||[]).length, false)).join('');
-  chipsHost.addEventListener('click', (e)=>{
-    const t=e.target.closest('[data-cat]'); if(!t) return;
-    const name=t.dataset.cat;
-    if(activeCats.has(name)) activeCats.delete(name); else activeCats.add(name);
-    // toggle UI
-    chipsHost.querySelectorAll('[data-cat]').forEach(el=>{
-      el.classList.toggle('active', activeCats.has(el.dataset.cat));
-    });
-    run();
-  });
-
-  // filters
-  const q=document.getElementById('q'), loc=document.getElementById('loc'), w=document.getElementById('w');
-  set(loc, (c.locations||[]).length?c.locations:FALLBACK_LOCATIONS, 'All locations');
-
-  function run(){
-    const text=(q.value||'').toLowerCase(), lsel=loc.value||'', wsel=w.value||'';
-    let list=data;
-
-    if(activeCats.size) list=list.filter(x=>activeCats.has(x.category||''));
-    if(lsel) list=list.filter(x=>(x.location||'')===lsel);
-    if(wsel) list=list.filter(x=>String(x.warranty_status||'').toLowerCase()===wsel.toLowerCase());
-    if(text) list=list.filter(x=>(`${x.title} ${x.brand} ${x.model} ${x.serial} ${x.asset_tag} ${x.location} ${x.room} ${x.dept}`.toLowerCase().includes(text)));
-
-    drawTable(sortData(list));
-  }
-  [q,loc,w].forEach(el=>el.addEventListener('input',run));
-  run();
-
-  // header click sorting
-  document.querySelectorAll('th.sortable').forEach(th=>{
-    th.addEventListener('click', ()=>{
-      const k=th.dataset.k;
-      if(k===sortK){ sortDir = (sortDir==='asc'?'desc':'asc'); }
-      else { sortK=k; sortDir='asc'; }
-      run();
-    });
-  });
-})();
-</script>
-</body>
-</html>
+      // Build chips with counts (use config order if provided)
+      const byCat = groupBy(data,'category');
+      const order = (c.categories && c.categories.length) ? c.categories : Object.keys(byCat);
+      const chipsHost = document.getElementById('catChips');
+      chipsHost.innerHTML = order
+        .filter(Boolean)
+        .map(cat => `<span class="chip" data-cat="${cat}">${cat} (${(byCat[cat]||[]).length||0})</span>`)
+        .join('');
+      chipsHost.addEventListener('click', (e)=>{
+        const t=e.target.closest('[data-cat]'); if(!t) return;
+        const name=t.dataset.cat;
+        if(activeCats.has(name)) activeCats.delete(name); else activeCats.add(name);
+        // toggle UI stat
