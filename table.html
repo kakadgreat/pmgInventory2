@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Inventory Table</title>
+<link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+<header id="topbar" class="topbar">
+  <div class="topbar-inner">
+    <a class="btn" href="index.html">← Home</a>
+    <a class="btn" href="list.html">Cards</a>
+    <strong style="margin-left:.5rem">Inventory Table</strong>
+  </div>
+</header>
+
+<main class="container screenfill">
+  <section class="pill">
+    <div class="row" style="justify-content:space-between; gap:.5rem; flex-wrap:wrap">
+      <div class="row">
+        <input id="q" type="search" placeholder="Search title, serial, brand, location…" />
+        <select id="cat"><option value="">All categories</option></select>
+        <select id="loc"><option value="">All locations</option></select>
+        <select id="w"><option value="">Any warranty</option><option>Active</option><option>Deactivated</option></select>
+      </div>
+      <div class="row">
+        <a class="btn" href="admin/add">+ Add</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="table-wrap">
+    <table class="table" id="t">
+      <thead>
+        <tr>
+          <th>Category</th>
+          <th>Brand</th>
+          <th>Title</th>
+          <th>Serial</th>
+          <th>Location</th>
+          <th>Room</th>
+          <th>Dept</th>
+          <th>Warranty status</th>
+          <th>Warranty expires</th>
+        </tr>
+      </thead>
+      <tbody id="tb"></tbody>
+    </table>
+  </section>
+</main>
+
+<script>
+const FALLBACK_LOCATIONS=["Jasper Primary Care","Jasper Pediatrics","Jasper MedSpa","Roswell Primary Care","Roswell MedSpa","Canton Primary Care","Canton Pediatrics","Canton MedSpa","Rome Primary Care","Rome MedSpa"];
+async function cfg(){ try{ const r=await fetch('/.netlify/functions/config'); if(r.ok) return await r.json(); }catch{} return { categories:["Desktops","Laptops","Phones","Printers","Scanners","Other"], locations:FALLBACK_LOCATIONS }; }
+async function load(){ try{ const r=await fetch('/.netlify/functions/inventory',{cache:'no-store'}); if(r.ok) return await r.json(); }catch{} return []; }
+function set(sel, arr, label){ sel.innerHTML=label?`<option value="">${label}</option>`:''; [...new Set(arr.filter(Boolean))].sort().forEach(v=>sel.insertAdjacentHTML('beforeend', `<option>${v}</option>`)); }
+
+(async () => {
+  const [data, c] = await Promise.all([load(), cfg()]);
+  const q=document.getElementById('q'), cat=document.getElementById('cat'), loc=document.getElementById('loc'), w=document.getElementById('w'), tb=document.getElementById('tb');
+  set(cat, (c.categories||[]).length?c.categories:["Desktops","Laptops","Phones","Other"], 'All categories');
+  set(loc, (c.locations||[]).length?c.locations:FALLBACK_LOCATIONS, 'All locations');
+
+  function draw(list){
+    tb.innerHTML = list.map(x=>`
+      <tr>
+        <td>${x.category||'-'}</td>
+        <td>${x.brand||'-'}</td>
+        <td><a class="row-link" href="admin/edit.html?slug=${encodeURIComponent(x.slug||'')}">${x.title||'-'}</a></td>
+        <td>${x.serial||'-'}</td>
+        <td>${x.location||'-'}</td>
+        <td>${x.room||'-'}</td>
+        <td>${x.dept||'-'}</td>
+        <td>${x.warranty_status||'-'}</td>
+        <td>${x.warranty_expires||'-'}</td>
+      </tr>
+    `).join('') || `<tr><td colspan="9" class="small">No results.</td></tr>`;
+  }
+
+  function run(){
+    const text=(q.value||'').toLowerCase(), csel=cat.value||'', lsel=loc.value||'', wsel=w.value||'';
+    let list=data;
+    if(csel) list=list.filter(x=>String(x.category||'').toLowerCase()===csel.toLowerCase());
+    if(lsel) list=list.filter(x=>(x.location||'')===lsel);
+    if(wsel) list=list.filter(x=>String(x.warranty_status||'').toLowerCase()===wsel.toLowerCase());
+    if(text) list=list.filter(x=>(`${x.title} ${x.brand} ${x.model} ${x.serial} ${x.asset_tag} ${x.location} ${x.room} ${x.dept}`.toLowerCase().includes(text)));
+    draw(list);
+  }
+  [q,cat,loc,w].forEach(el=>el.addEventListener('input',run));
+  run();
+})();
+</script>
+</body>
+</html>
