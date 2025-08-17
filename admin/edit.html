@@ -2,97 +2,143 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Edit Item</title>
+<title>Edit Inventory Item</title>
 <link rel="stylesheet" href="../style.css"/>
 </head>
 <body>
-<header class="topbar"><div class="topbar-inner">
-  <a class="btn" href="../list.html">← Back to List</a>
-  <strong style="margin-left:.5rem">Edit Item</strong>
-</div></header>
+<header id="topbar" class="topbar">
+  <div class="topbar-inner">
+    <a class="btn" href="../index.html">← Home</a>
+    <a class="btn" href="../list.html">List</a>
+    <a class="btn" href="../table.html">Table</a>
+    <strong style="margin-left:.5rem">Edit Item</strong>
+  </div>
+</header>
 
-<main class="container">
-  <section class="pill">
-    <form id="f" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px">
-      <input name="slug" id="slug" type="hidden">
-      <label>Category
-        <select name="category" id="category" required></select>
-      </label>
-      <label>Title <input name="title" id="title"></label>
+<main class="container screenfill">
+  <div id="summary" class="pill" style="display:none"></div>
 
-      <label>Brand <input name="brand" id="brand"></label>
-      <label>Model <input name="model" id="model"></label>
+  <form id="f" class="zones" style="display:none">
+    <!-- identity -->
+    <section class="zone half">
+      <h2>Identity & Classification</h2>
+      <div class="grid2">
+        <label>Category
+          <select name="category" id="category"></select>
+        </label>
+        <label>Brand <input name="brand" id="brand"></label>
+        <label>Title <input name="title" id="title" required></label>
+        <label>Model <input name="model" id="model"></label>
+        <label>Asset tag <input name="asset_tag" id="asset_tag"></label>
+        <label>Serial <input name="serial" id="serial"></label>
+        <label>Status <input name="status" id="status"></label>
+      </div>
+    </section>
 
-      <label>Asset tag <input name="asset_tag" id="asset_tag"></label>
-      <label>Serial <input name="serial" id="serial"></label>
+    <!-- location -->
+    <section class="zone half">
+      <h2>Ownership & Location</h2>
+      <div class="grid2">
+        <label>User <input name="user" id="user"></label>
+        <label>Email <input name="email" id="email" type="email"></label>
+        <label>Location
+          <select name="location" id="location"></select>
+        </label>
+        <label>Room <input name="room" id="room"></label>
+        <label>Dept <input name="dept" id="dept"></label>
+        <span></span>
+      </div>
+    </section>
 
-      <label>User <input name="user" id="user"></label>
-      <label>Email <input name="email" id="email"></label>
+    <!-- hardware -->
+    <section class="zone half">
+      <h2>Hardware Specs</h2>
+      <div class="grid2">
+        <label>OS <input name="os" id="os"></label>
+        <label>CPU <input name="cpu" id="cpu"></label>
+        <label>RAM <input name="ram" id="ram"></label>
+        <label>Storage <input name="storage" id="storage"></label>
+      </div>
+    </section>
 
-      <label>Location
-        <select name="location" id="location"></select>
-      </label>
-      <label>Room <input name="room" id="room"></label>
+    <!-- lifecycle -->
+    <section class="zone half">
+      <h2>Lifecycle & Warranty</h2>
+      <div class="grid2">
+        <label>Warranty status
+          <select name="warranty_status" id="warranty_status">
+            <option>Active</option><option>Deactivated</option>
+          </select>
+        </label>
+        <label>Warranty expires <input name="warranty_expires" id="warranty_expires" placeholder="YYYY-MM-DD"></label>
+        <label>Purchase date <input name="purchase_date" id="purchase_date" placeholder="YYYY-MM-DD"></label>
+        <span></span>
+      </div>
+    </section>
 
-      <label>Dept <input name="dept" id="dept"></label>
-      <label>Status <input name="status" id="status"></label>
+    <!-- notes -->
+    <section class="zone">
+      <h2>Notes</h2>
+      <textarea name="notes" id="notes" rows="3"></textarea>
+    </section>
 
-      <label>Warranty status
-        <select name="warranty_status" id="warranty_status">
-          <option value="">(none)</option>
-          <option>Active</option>
-          <option>Deactivated</option>
-        </select>
-      </label>
-      <label>Warranty expires <input name="warranty_expires" id="warranty_expires" placeholder="YYYY-MM-DD"></label>
-
-      <label>OS <input name="os" id="os"></label>
-      <label>CPU <input name="cpu" id="cpu"></label>
-
-      <label>RAM <input name="ram" id="ram"></label>
-      <label>Storage <input name="storage" id="storage"></label>
-
-      <label style="grid-column:1/-1">Notes <input name="notes" id="notes"></label>
-
-      <button class="btn primary" type="submit" style="grid-column:1/-1">Save</button>
-    </form>
-    <pre id="out" class="small" style="margin-top:8px"></pre>
-  </section>
+    <section class="sticky-actions">
+      <div class="row" style="justify-content:space-between">
+        <div id="chips" class="row"></div>
+        <div class="row">
+          <a class="btn" href="../list.html">Back</a>
+          <button class="btn primary" type="submit">Save Changes</button>
+        </div>
+      </div>
+      <div id="msg" class="small" style="margin-top:.25rem"></div>
+    </section>
+  </form>
 </main>
 
 <script>
-async function loadCfg(){
-  try { const r = await fetch('/.netlify/functions/config'); if (r.ok) return await r.json(); } catch {}
-  return (await (await fetch('../assets/config.json')).json());
-}
-async function loadItem(slug){
-  const r = await fetch('/.netlify/functions/inventory?slug='+encodeURIComponent(slug));
-  const arr = await r.json(); return arr[0] || {};
-}
-function fillSelect(sel, items){
-  sel.innerHTML = ''; (items||[]).forEach(v => sel.insertAdjacentHTML('beforeend', `<option>${v}</option>`));
-}
-(async () => {
-  const params = new URLSearchParams(location.search);
-  const slug = params.get('slug');
-  if(!slug){ alert('Missing slug'); history.back(); return; }
+const FALLBACK_LOCATIONS=["Jasper Primary Care","Jasper Pediatrics","Jasper MedSpa","Roswell Primary Care","Roswell MedSpa","Canton Primary Care","Canton Pediatrics","Canton MedSpa","Rome Primary Care","Rome MedSpa"];
+async function cfg(){ try{ const r=await fetch('/.netlify/functions/config'); if(r.ok) return await r.json(); }catch{} return { categories:["Desktops","Laptops","Phones","Printers","Scanners","Other"], locations:FALLBACK_LOCATIONS }; }
+function fill(sel,items){ sel.innerHTML=''; items.forEach(v=>sel.insertAdjacentHTML('beforeend',`<option>${v}</option>`)); }
+const params=new URLSearchParams(location.search); const slug=params.get('slug');
 
-  const cfg = await loadCfg();
-  fillSelect(document.getElementById('category'), cfg.categories || []);
-  fillSelect(document.getElementById('location'), cfg.locations || []);
+async function loadItem(slug){ const r=await fetch('/.netlify/functions/inventory?slug='+encodeURIComponent(slug)); if(!r.ok) return null; const a=await r.json(); return a[0]||null; }
+
+(async () => {
+  if(!slug){ alert('Missing slug'); location.href='../list.html'; return; }
+  const c = await cfg();
+  fill(document.getElementById('category'), (c.categories||[]).length?c.categories:["Desktops","Laptops","Phones","Other"]);
+  fill(document.getElementById('location'), (c.locations||[]).length?c.locations:FALLBACK_LOCATIONS);
 
   const x = await loadItem(slug);
-  const f = document.getElementById('f');
-  Object.keys(x).forEach(k => { const el = document.getElementById(k); if(el) el.value = x[k] || ''; });
-  document.getElementById('slug').value = slug;
+  if(!x){ alert('Item not found'); location.href='../list.html'; return; }
 
-  f.addEventListener('submit', async (e) => {
+  // render header chips
+  const s=document.getElementById('summary'); s.style.display='block';
+  s.innerHTML = `
+    <div class="row">
+      <h1 style="margin:0">${x.title||'-'}</h1>
+      <span class="badge">${x.category||'-'}</span>
+      <span class="badge">${x.brand||''}</span>
+      ${x.warranty_status?`<span class="badge ${String(x.warranty_status).toLowerCase()==='active'?'ok':'bad'}">${x.warranty_status}</span>`:''}
+      ${x.location?`<span class="badge">${x.location}</span>`:''}
+    </div>
+    <div class="small" style="margin-top:.25rem">Serial: ${x.serial||'-'} • Asset: ${x.asset_tag||'-'}</div>
+  `;
+
+  // populate form
+  const ids=["category","brand","title","model","asset_tag","serial","status","user","email","location","room","dept","os","cpu","ram","storage","warranty_status","warranty_expires","purchase_date","notes"];
+  ids.forEach(id=>{ const el=document.getElementById(id); if(el) el.value = x[id] || ''; });
+
+  document.getElementById('f').style.display='block';
+
+  // submit
+  const f=document.getElementById('f'), msg=document.getElementById('msg');
+  f.addEventListener('submit', async (e)=>{
     e.preventDefault();
-    const o = Object.fromEntries(new FormData(f).entries());
-    Object.keys(o).forEach(k => { if(o[k]==='') delete o[k]; });
-    o.slug = slug; // keep same ID
-    const res = await fetch('/.netlify/functions/inventory', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ item:o })});
-    const txt = await res.text(); document.getElementById('out').textContent = txt;
+    const o=Object.fromEntries(new FormData(f).entries()); Object.keys(o).forEach(k=>{ if(o[k]==='') delete o[k]; });
+    o.slug = slug; // keep same slug
+    const res = await fetch('/.netlify/functions/inventory', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ item:o }) });
+    msg.textContent = res.ok ? 'Saved ✔' : 'Error saving';
   });
 })();
 </script>
