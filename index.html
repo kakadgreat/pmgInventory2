@@ -6,6 +6,11 @@
 <link rel="stylesheet" href="style.css"/>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+  /* little progress bar inside the Active card */
+  .bar{height:8px;border-radius:999px;background:#e5e7eb;overflow:hidden}
+  .bar > i{display:block;height:100%;background:#10b981}
+</style>
 </head>
 <body>
 <header id="topbar" class="topbar">
@@ -21,9 +26,9 @@
 </header>
 
 <main class="container">
-  <!-- System/health -->
+  <!-- Health -->
   <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:.5rem">
-    <div class="small">Welcome! Use Quick actions below or jump to a saved View.</div>
+    <h1 style="font-size:1.25rem;margin:0">Dashboard</h1>
     <span id="health" class="badge">Loading…</span>
   </div>
 
@@ -37,7 +42,7 @@
       <a class="btn" href="admin/">Admin</a>
       <a class="btn" href="/.netlify/functions/config">Config</a>
       <span class="row" style="gap:.4rem;margin-left:auto">
-        <input id="phoneQ" placeholder="Find a person/ext…" />
+        <input id="phoneQ" placeholder="Find person / ext / team…" />
         <a class="btn" id="phoneGo">Phone search</a>
       </span>
     </div>
@@ -48,10 +53,10 @@
     <div class="stat-grid" id="stats"></div>
   </section>
 
-  <!-- Inventory overview with mini pies -->
+  <!-- Inventory overview + pies -->
   <section class="pill">
     <h2>Inventory Overview</h2>
-    <p class="small">Data parsed from <em>Computer Inventory 2025 Ankur.xlsx</em>. Click a category to view details.</p>
+    <p class="small">Source: <em>Computer Inventory 2025 Ankur.xlsx</em>. Click a category to view details.</p>
     <div class="overview-grid">
       <div id="catPills" class="chips"></div>
       <aside class="overview-side">
@@ -64,7 +69,7 @@
   <!-- Expiring soon -->
   <section class="pill">
     <div class="row" style="justify-content:space-between;align-items:center">
-      <h2 style="margin:0">Expiring Soon</h2>
+      <h2 style="margin:0">Warranties expiring</h2>
       <div class="row" style="gap:.4rem">
         <label class="small">Window</label>
         <select id="expWin">
@@ -83,120 +88,86 @@
   <!-- Location heatmap -->
   <section class="pill">
     <h2>Location Heatmap</h2>
-    <div class="chart-card">
-      <canvas id="locChart" height="220"></canvas>
-    </div>
-  </section>
-
-  <!-- Views + tools -->
-  <section class="pill">
-    <div class="row" style="justify-content:space-between;align-items:center">
-      <h2 style="margin:0">Saved Views & Tools</h2>
-      <div class="row no-print" style="gap:.5rem">
-        <button class="btn blue" id="btnCSV">Export CSV</button>
-        <button class="btn blue" id="btnQR">QR Labels</button>
-      </div>
-    </div>
-
-    <div class="row no-print" style="gap:.5rem;flex-wrap:wrap;margin:.5rem 0">
-      <input id="viewName" placeholder="View name (e.g., Rome Laptops)"/>
-      <select id="viewLoc" title="Location"></select>
-      <select id="viewCats" multiple title="Categories" style="min-width:220px"></select>
-      <button class="btn" id="saveView">Save view</button>
-    </div>
-    <div id="views" class="chips"></div>
+    <div class="chart-card"><canvas id="locChart" height="220"></canvas></div>
   </section>
 </main>
 
-<!-- QR overlay -->
-<div id="qrOverlay" class="qr-overlay no-print" style="display:none">
-  <div class="qr-controls">
-    <button class="btn" id="qrClose">Close</button>
-    <button class="btn blue" onclick="window.print()">Print</button>
-  </div>
-  <div id="qrGrid" class="qr-grid"></div>
-</div>
-
 <script>
-/* ---------- utilities & robust data load ---------- */
-const PALETTE=["#10b981","#60a5fa","#f59e0b","#ef4444","#a78bfa","#34d399","#f472b6","#f97316","#22d3ee","#84cc16"];
 const FALLBACK_LOC=["Jasper Primary Care","Jasper Pediatrics","Jasper MedSpa","Roswell Primary Care","Roswell MedSpa","Canton Primary Care","Canton Pediatrics","Canton MedSpa","Rome Primary Care","Rome MedSpa"];
-async function getJSON(u){const r=await fetch(u,{cache:'no-store'});if(!r.ok)throw new Error(r.status);return r.json();}
+const PALETTE=["#10b981","#60a5fa","#f59e0b","#ef4444","#a78bfa","#34d399","#f472b6","#f97316","#22d3ee","#84cc16"];
+async function getJSON(u){const r=await fetch(u,{cache:'no-store'}); if(!r.ok)throw new Error(r.status); return r.json();}
 async function loadData(){
-  try{const d=await getJSON('/.netlify/functions/inventory'); return {items:Array.isArray(d)?d:(d.items||[]),source:'fn'};}
-  catch(e){try{const d=await getJSON('/data.json');return{items:Array.isArray(d)?d:(d.items||[]),source:'fallback'};}
-  catch(e2){return{items:[],source:'error'};}}
+  try{ const d=await getJSON('/.netlify/functions/inventory'); return {items:Array.isArray(d)?d:(d.items||[]),source:'fn'}; }
+  catch{ try{ const d=await getJSON('/data.json'); return {items:Array.isArray(d)?d:(d.items||[]),source:'json'}; } catch{ return {items:[],source:'error'}; } }
 }
 async function loadCfg(){try{return await getJSON('/.netlify/functions/config');}catch{return{locations:FALLBACK_LOC,categories:["Desktops","Laptops","Phones","Other"]};}}
-function by(list, key){const m=new Map();list.forEach(x=>{const k=(typeof key==='function')?key(x):(x[key]||'Unknown');m.set(k,(m.get(k)||0)+1)});return m;}
-function toCSV(rows){
-  if(!rows.length) return '';
-  const keys=[...new Set(rows.flatMap(r=>Object.keys(r)))];
-  const esc=v=>`"${String(v??'').replaceAll('"','""')}"`;
-  return [keys.join(','),...rows.map(r=>keys.map(k=>esc(r[k])).join(','))].join('\n');
-}
+function by(list,key){const m=new Map(); list.forEach(x=>{const k=(typeof key==='function')?key(x):(x[key]||'Unknown'); m.set(k,(m.get(k)||0)+1)}); return m;}
 function parseDate(s){ if(!s) return null; const d=new Date(s); return isNaN(d)?null:d; }
-function daysUntil(d){ const ms=d - new Date(); return Math.ceil(ms/86400000);}
-
-/* ---------- small helpers ---------- */
-function pie(ctx,labels,data){const colors=labels.map((_,i)=>PALETTE[i%PALETTE.length]);return new Chart(ctx,{type:'pie',data:{labels,datasets:[{data,backgroundColor:colors,borderColor:'#fff',borderWidth:2}]},options:{plugins:{legend:{display:false}},maintainAspectRatio:false,responsive:true}});}
+function daysUntil(d){ return Math.ceil((d - new Date())/86400000); }
+function pie(ctx,labels,data){const colors=labels.map((_,i)=>PALETTE[i%PALETTE.length]); return new Chart(ctx,{type:'pie',data:{labels,datasets:[{data,backgroundColor:colors,borderColor:'#fff',borderWidth:2}]},options:{plugins:{legend:{display:false}},maintainAspectRatio:false,responsive:true}});}
 function bar(ctx,labels,data){return new Chart(ctx,{type:'bar',data:{labels,datasets:[{data,backgroundColor:'#60a5fa'}]},options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});}
 
-/* ---------- main ---------- */
 (async ()=>{
   const [{items,source}, cfg] = await Promise.all([loadData(), loadCfg()]);
   const health=document.getElementById('health');
-  if(source==='fn'){ health.textContent='Live data'; health.className='badge fn-ok'; }
-  else if(source==='fallback'){ health.textContent='Using data.json'; health.className='badge fn-fallback'; }
-  else { health.textContent='Data error'; health.className='badge fn-error'; }
+  health.textContent = source==='fn' ? 'Live data' : source==='json' ? 'Using data.json' : 'Data error';
+  health.className = source==='fn' ? 'badge fn-ok' : source==='json' ? 'badge fn-fallback' : 'badge fn-error';
 
-  const data = items;
+  const data=items;
   const cats = cfg.categories?.length?cfg.categories:[...new Set(data.map(x=>x.category).filter(Boolean))];
   const locs = cfg.locations?.length?cfg.locations:FALLBACK_LOC;
 
-  /* Quick phone search */
+  // PHONE QUICK SEARCH
   document.getElementById('phoneGo').onclick = () => {
     const q=document.getElementById('phoneQ').value.trim();
     location.href = 'phone.html?q='+encodeURIComponent(q);
   };
 
-  /* ----- Stat cards ----- */
-  function renderStats(){
-    const g=document.getElementById('stats'); g.innerHTML='';
-    const byCat=by(data,'category'); const active=by(data,x=>(String(x.warranty_status||'').toLowerCase()==='active'?'Active':'Other'));
-    const soon=data.filter(x=>{const d=parseDate(x.warranty_expires); return d && daysUntil(d)<=90;}).length;
-    const total=data.length, act=(active.get('Active')||0), deact=total-act;
+  // ====== STAT CARDS ======
+  const s = document.getElementById('stats');
+  const byCat = by(data,'category');
+  const total = data.length;
+  const active = data.filter(x => String(x.warranty_status||'').toLowerCase()==='active').length;
+  const deact  = total - active;
+  const pct = total ? Math.round(active*100/total) : 0;
 
-    const make=(title,val,sub='')=>`<div class="stat"><h4>${title}</h4><div class="big">${val}</div><div class="small">${sub}</div></div>`;
-    g.insertAdjacentHTML('beforeend', make('Total Items', total, `${cats.map(c=>`${c}: ${byCat.get(c)||0}`).join(' · ')}`));
-    g.insertAdjacentHTML('beforeend', make('Active', act, `Deactivated: ${deact}`));
-    g.insertAdjacentHTML('beforeend', make('Expiring ≤ 90 days', soon, 'See list below'));
-    const phoneCount = (byCat.get('Phones')||byCat.get('Phone')||0);
-    g.insertAdjacentHTML('beforeend', make('Phones', phoneCount, 'Quick search above'));
-  }
-  renderStats();
+  const exp90 = data.filter(x => {const d=parseDate(x.warranty_expires); return d && daysUntil(d)<=90;});
+  const exp30 = exp90.filter(x => daysUntil(parseDate(x.warranty_expires))<=30).length;
+  const exp60 = exp90.filter(x => daysUntil(parseDate(x.warranty_expires))>30 && daysUntil(parseDate(x.warranty_expires))<=60).length;
+  const exp90only = exp90.length - exp30 - exp60;
 
-  /* ----- Overview pills + pies ----- */
-  const catCounts = by(data,'category');
+  const make = (title,html,sub='')=>`<div class="stat"><h4>${title}</h4><div class="big">${html}</div><div class="small">${sub}</div></div>`;
+  s.innerHTML =
+    make('Total inventory', total, cats.map(c=>`${c}: ${byCat.get(c)||0}`).join(' · ')) +
+    make('Active status', `${active} / ${total}<div class="bar" style="margin-top:.35rem"><i style="width:${pct}%"></i></div>`, `Deactivated: ${deact}`) +
+    make('Expiring soon', exp90.length, `30d: ${exp30} · 60d: ${exp60} · 90d: ${exp90only}`) +
+    make('Phones', byCat.get('Phones')||byCat.get('Phone')||0, 'Use quick search above');
+
+  // ====== OVERVIEW PILLS + PIES ======
   const catPills=document.getElementById('catPills');
-  catPills.innerHTML = cats.map(k=>`<a class="chip" href="list.html?categories=${encodeURIComponent(k)}">${k} (${catCounts.get(k)||0})</a>`).join('');
-  pie(document.getElementById('catChart').getContext('2d'), cats, cats.map(c=>catCounts.get(c)||0));
+  const pills = cats.map(c=>({c,n:byCat.get(c)||0})).filter(x=>x.n>0).sort((a,b)=>b.n-a.n);
+  catPills.innerHTML = pills.map(x=>`<a class="chip" href="list.html?categories=${encodeURIComponent(x.c)}">${x.c} (${x.n})</a>`).join('');
+  pie(document.getElementById('catChart').getContext('2d'), pills.map(x=>x.c), pills.map(x=>x.n));
 
-  const wCounts = by(data, x => {const s=String(x.warranty_status||'').toLowerCase();return (s==='active'?'Active':(s==='deactivated'?'Deactivated':'Unknown'));});
+  const wCounts = by(data, x => {
+    const s=String(x.warranty_status||'').toLowerCase();
+    return s==='active'?'Active':s==='deactivated'?'Deactivated':'Unknown';
+  });
   const wLabels=['Active','Deactivated','Unknown'].filter(k=>wCounts.has(k));
   pie(document.getElementById('warChart').getContext('2d'), wLabels, wLabels.map(k=>wCounts.get(k)||0));
 
-  /* ----- Expiring soon ----- */
+  // ====== EXPIRING LIST ======
   const expTbl=document.querySelector('#expTbl tbody');
-  function drawExp(days=60){
-    const list=data.filter(x=>{const d=parseDate(x.warranty_expires); return d && daysUntil(d)<=days;})
-                   .sort((a,b)=>parseDate(a.warranty_expires)-parseDate(b.warranty_expires))
-                   .slice(0,25);
+  function drawExp(win=60){
+    const list=data
+      .filter(x=>{const d=parseDate(x.warranty_expires); return d && daysUntil(d)<=win;})
+      .sort((a,b)=>parseDate(a.warranty_expires)-parseDate(b.warranty_expires))
+      .slice(0,25);
     expTbl.innerHTML = list.map(x=>`
       <tr>
         <td>${x.title||'-'}</td>
         <td>${x.category||'-'}</td>
-        <td>${x.location||'-'}</td>
+        <td><a href="list.html?location=${encodeURIComponent(x.location||'')}">${x.location||'-'}</a></td>
         <td>${x.warranty_expires||'-'}</td>
         <td><a class="btn sm" href="admin/edit.html?slug=${encodeURIComponent(x.slug||'')}">Edit</a></td>
       </tr>
@@ -205,59 +176,20 @@ function bar(ctx,labels,data){return new Chart(ctx,{type:'bar',data:{labels,data
   drawExp(60);
   document.getElementById('expWin').onchange=e=>drawExp(parseInt(e.target.value,10));
 
-  /* ----- Location heatmap ----- */
-  const byLoc=by(data,'location'); const locLabels=locs.filter(Boolean);
-  const locValues=locLabels.map(l=>byLoc.get(l)||0);
-  const lc=bar(document.getElementById('locChart').getContext('2d'), locLabels, locValues);
-  // click => go to list filtered by location
+  // ====== LOCATION HEATMAP ======
+  const byLoc = by(data,'location');
+  const labels = (locs||[]).filter(Boolean);
+  const vals    = labels.map(l=>byLoc.get(l)||0);
+  const barChart = new Chart(document.getElementById('locChart').getContext('2d'),{
+    type:'bar',
+    data:{labels,datasets:[{data:vals,backgroundColor:'#60a5fa'}]},
+    options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}
+  });
   document.getElementById('locChart').onclick = (evt)=>{
-    const p=lc.getElementsAtEventForMode(evt,'nearest',{intersect:true},true)[0]; if(!p) return;
-    const label=lc.data.labels[p.index];
-    location.href='list.html?location='+encodeURIComponent(label);
+    const p=barChart.getElementsAtEventForMode(evt,'nearest',{intersect:true},true)[0]; if(!p) return;
+    const loc = barChart.data.labels[p.index];
+    location.href = 'list.html?location='+encodeURIComponent(loc);
   };
-
-  /* ----- Saved views ----- */
-  const viewLoc=document.getElementById('viewLoc'), viewCats=document.getElementById('viewCats'), viewsHost=document.getElementById('views');
-  locs.forEach(l=>viewLoc.insertAdjacentHTML('beforeend', `<option>${l}</option>`));
-  cats.forEach(c=>viewCats.insertAdjacentHTML('beforeend', `<option>${c}</option>`));
-  const loadViews=()=>JSON.parse(localStorage.getItem('pmg_views')||'[]');
-  const saveViews=v=>localStorage.setItem('pmg_views',JSON.stringify(v));
-  function renderViews(){
-    const vs=loadViews();
-    viewsHost.innerHTML = vs.map(v=>{
-      const qs=[]; if(v.location) qs.push('location='+encodeURIComponent(v.location));
-      if(v.categories?.length) qs.push('categories='+encodeURIComponent(v.categories.join('|')));
-      return `<a class="view-chip" href="list.html?${qs.join('&')}">${v.name}</a>`;
-    }).join('') || `<span class="small">No saved views yet.</span>`;
-  }
-  renderViews();
-  document.getElementById('saveView').onclick = ()=>{
-    const name=document.getElementById('viewName').value.trim(); if(!name) return alert('Give the view a name.');
-    const loc=viewLoc.value||'';
-    const catsSel=[...viewCats.selectedOptions].map(o=>o.value);
-    const vs=loadViews(); vs.push({name,location:loc,categories:catsSel}); saveViews(vs); renderViews();
-    document.getElementById('viewName').value='';
-  };
-
-  /* ----- Export CSV (all items) ----- */
-  document.getElementById('btnCSV').onclick = ()=>{
-    const csv=toCSV(data); const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
-    const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='inventory-export.csv'; a.click(); URL.revokeObjectURL(a.href);
-  };
-
-  /* ----- QR labels (all items; first 48) ----- */
-  const qrOverlay=document.getElementById('qrOverlay'), qrGrid=document.getElementById('qrGrid');
-  document.getElementById('btnQR').onclick=()=>{
-    qrGrid.innerHTML='';
-    data.slice(0,48).forEach(item=>{
-      const id='qr-'+(item.slug||crypto.randomUUID());
-      const link=location.origin+'/admin/edit.html?slug='+(encodeURIComponent(item.slug||''));
-      qrGrid.insertAdjacentHTML('beforeend', `<div class="qr-label"><div id="${id}"></div><div class="meta">${item.title||'-'}<br><span>${item.serial||''}</span></div></div>`);
-      new QRCode(document.getElementById(id),{text:link,width:140,height:140,correctLevel:QRCode.CorrectLevel.M});
-    });
-    qrOverlay.style.display='block';
-  };
-  document.getElementById('qrClose').onclick=()=>{qrOverlay.style.display='none';};
 })();
 </script>
 </body>
