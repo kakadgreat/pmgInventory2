@@ -1,0 +1,35 @@
+[
+  {
+    "name": "Amy Mitton",
+    "extension": "1102",
+    "direct": "",
+    "mobile": "",
+    "email": "amy.mitton@prestigemedicalgroup.org",
+    "location": "Jasper Primary Care",
+    "team": "PROVIDERS",
+    "role": "User",
+    "status": "Active"
+  },
+  {
+    "name": "Anna Kinley",
+    "extension": "1112",
+    "direct": "",
+    "mobile": "",
+    "email": "anna.kinley@prestigemedicalgroup.org",
+    "location": "Jasper Pediatrics",
+    "team": "PROVIDERS",
+    "role": "User",
+    "status": "Active"
+  },
+  {
+    "name": "Call Center 9",
+    "extension": "",
+    "direct": "",
+    "mobile": "",
+    "email": "pmg_callcenter9@prestigemedicalgroup.org",
+    "location": "Canton Primary Care",
+    "team": "CALL CENTER",
+    "role": "User",
+    "status": "Active"
+  }
+]
