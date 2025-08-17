@@ -6,22 +6,28 @@
   <title>Inventory Table</title>
   <link rel="stylesheet" href="style.css"/>
 
-  <!-- Small page-local helpers so this file works even if CSS tweaks are missing -->
+  <!-- Page-local CSS to ensure layout even if global styles change -->
   <style>
-    /* put Add/Print on the top-right nicely */
     .actions-right{ display:flex; gap:.5rem; align-items:center; }
-    /* light-blue buttons (will be overridden by your global .btn styles if present) */
     .btn.blue{ background:#e0f2fe; border:1px solid #bae6fd; color:#075985; }
     .btn.blue:hover{ filter:brightness(.98); }
-    /* make sortable headers clickable */
+
     th.sortable{ cursor:pointer; user-select:none; }
     th .arrow{ opacity:.45; margin-left:.25rem; }
     th.sort-active{ background:#ecfdf5; color:#065f46; border-bottom-color:#10b981 !important; }
     th.sort-active .arrow{ opacity:1; }
-    /* hide Actions column when printing; repeat header each page */
+
+    .chips{ display:flex; gap:.5rem; flex-wrap:wrap; margin:.35rem 0; }
+    .chip{ border:1px solid #e5e7eb; background:#fff; padding:.35rem .65rem; border-radius:999px; cursor:pointer; }
+    .chip.active{ background:#ecfdf5; border-color:#10b981; color:#065f46; }
+
+    .note{ padding:.5rem .75rem; border:1px solid #e5e7eb; border-radius:8px; background:#f9fafb; }
+    .small{ font-size:.9rem; color:#6b7280; }
+
     @media print{
       .col-actions{ display:none !important; }
       table thead{ display:table-header-group; }
+      .actions-right, .chips, .filters, .btn, .note{ display:none !important; }
     }
   </style>
 </head>
@@ -41,11 +47,11 @@
       <h2 style="margin:0 0 .25rem 0">Inventory Overview</h2>
 
       <!-- Category chips with counts (multi-select) -->
-      <div id="catChips" class="chips" style="margin-bottom:.25rem"></div>
+      <div id="catChips" class="chips"></div>
 
       <!-- Filters left, actions right -->
       <div class="row" style="justify-content:space-between; gap:.5rem; flex-wrap:wrap; align-items:center">
-        <div class="row" style="gap:.5rem; flex-wrap:wrap">
+        <div class="filters row" style="gap:.5rem; flex-wrap:wrap">
           <input id="q" type="search" placeholder="Search title, serial, brand, location…" />
           <select id="loc"><option value="">All locations</option></select>
           <select id="w">
@@ -60,6 +66,8 @@
           <button class="btn blue" onclick="window.print()">Print</button>
         </div>
       </div>
+
+      <div id="status" class="note small" style="display:none"></div>
     </section>
 
     <!-- Data table -->
@@ -85,42 +93,50 @@
   </main>
 
   <script>
-    // ----- Data helpers -----
-    const FALLBACK_LOCATIONS = [
-      "Jasper Primary Care","Jasper Pediatrics","Jasper MedSpa",
-      "Roswell Primary Care","Roswell MedSpa",
-      "Canton Primary Care","Canton Pediatrics","Canton MedSpa",
-      "Rome Primary Care","Rome MedSpa"
-    ];
+    // ---------- Robust data loading with fallback ----------
+    async function fetchJSON(url){
+      const res = await fetch(url, {cache:'no-store'});
+      if(!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.json();
+    }
+    async function loadData(){
+      try{
+        // 1) primary: serverless function
+        return await fetchJSON('/.netlify/functions/inventory');
+      }catch(e1){
+        console.warn('Function fetch failed:', e1);
+        try{
+          // 2) fallback: static data.json (you have a nav link for this)
+          return await fetchJSON('/data.json');
+        }catch(e2){
+          console.warn('data.json fetch failed:', e2);
+          throw new Error('Could not load inventory from function or data.json');
+        }
+      }
+    }
 
-    async function cfg(){
+    async function loadConfig(){
       try{
-        const r = await fetch('/.netlify/functions/config');
-        if(r.ok) return await r.json();
-      }catch(e){}
-      return { categories:["Desktops","Laptops","Phones","Printers","Scanners","Other"], locations:FALLBACK_LOCATIONS };
+        return await fetchJSON('/.netlify/functions/config');
+      }catch{
+        return { locations: [], categories: [] };
+      }
     }
-    async function load(){
-      try{
-        const r = await fetch('/.netlify/functions/inventory', {cache:'no-store'});
-        if(r.ok) return await r.json();
-      }catch(e){}
-      return [];
-    }
+
     function setSelect(sel, arr, label){
       sel.innerHTML = label?`<option value="">${label}</option>`:'';
-      [...new Set(arr.filter(Boolean))].sort()
+      [...new Set((arr||[]).filter(Boolean))].sort()
         .forEach(v => sel.insertAdjacentHTML('beforeend', `<option>${v}</option>`));
     }
-    function groupBy(xs, k){
-      return xs.reduce((a,x)=>((a[x[k]||'']=(a[x[k]||'']||[]).concat(x)),a),{});
+    function groupBy(xs,k){
+      return (xs||[]).reduce((a,x)=>((a[x[k]||'']=(a[x[k]||'']||[]).concat(x)),a),{});
     }
 
-    // ----- Page logic -----
+    // ---------- Page state ----------
     let data = [];
     let sortK = 'title';
     let sortDir = 'asc';
-    const activeCats = new Set(); // multi-select chips
+    const activeCats = new Set();
 
     function cmp(a,b,k){
       const av=(a[k]??'').toString().toLowerCase();
@@ -134,7 +150,7 @@
 
     function drawTable(list){
       const tb = document.getElementById('tb');
-      tb.innerHTML = list.map(x=>`
+      tb.innerHTML = (list||[]).map(x=>`
         <tr>
           <td>${x.category||'-'}</td>
           <td>${x.brand||'-'}</td>
@@ -149,7 +165,7 @@
         </tr>
       `).join('') || `<tr><td colspan="10" class="small">No results.</td></tr>`;
 
-      // header arrows + highlight
+      // header visuals
       document.querySelectorAll('th.sortable').forEach(th=>{
         th.classList.toggle('sort-active', th.dataset.k===sortK);
         const arrow = th.querySelector('.arrow');
@@ -158,19 +174,75 @@
     }
 
     (async ()=>{
-      const [d, c] = await Promise.all([load(), cfg()]);
-      data = d;
+      const status = document.getElementById('status');
+      try{
+        const [d, c] = await Promise.all([loadData(), loadConfig()]);
+        data = Array.isArray(d)? d : (d.items||[]);  // support both shapes
 
-      // Build chips with counts (use config order if provided)
-      const byCat = groupBy(data,'category');
-      const order = (c.categories && c.categories.length) ? c.categories : Object.keys(byCat);
-      const chipsHost = document.getElementById('catChips');
-      chipsHost.innerHTML = order
-        .filter(Boolean)
-        .map(cat => `<span class="chip" data-cat="${cat}">${cat} (${(byCat[cat]||[]).length||0})</span>`)
-        .join('');
-      chipsHost.addEventListener('click', (e)=>{
-        const t=e.target.closest('[data-cat]'); if(!t) return;
-        const name=t.dataset.cat;
-        if(activeCats.has(name)) activeCats.delete(name); else activeCats.add(name);
-        // toggle UI stat
+        if(!data.length){
+          status.style.display='block';
+          status.textContent = 'No inventory items were returned. If you just added data, refresh once more.';
+        }
+
+        // Build chips with counts
+        const byCat = groupBy(data,'category');
+        const order = (c.categories && c.categories.length) ? c.categories : Object.keys(byCat);
+        const chipsHost = document.getElementById('catChips');
+        chipsHost.innerHTML = (order||[]).filter(Boolean)
+          .map(cat => `<span class="chip" data-cat="${cat}">${cat} (${(byCat[cat]||[]).length||0})</span>`)
+          .join('') || `<span class="small">No categories found.</span>`;
+
+        chipsHost.addEventListener('click', (e)=>{
+          const t=e.target.closest('[data-cat]'); if(!t) return;
+          const name=t.dataset.cat;
+          if(activeCats.has(name)) activeCats.delete(name); else activeCats.add(name);
+          chipsHost.querySelectorAll('[data-cat]').forEach(el=>{
+            el.classList.toggle('active', activeCats.has(el.dataset.cat));
+          });
+          run();
+        });
+
+        // Filters
+        const q  = document.getElementById('q');
+        const loc= document.getElementById('loc');
+        const w  = document.getElementById('w');
+
+        const locs = (c.locations && c.locations.length) ? c.locations : data.map(x=>x.location);
+        setSelect(loc, locs, 'All locations');
+
+        function run(){
+          const text=(q.value||'').toLowerCase();
+          const lsel=loc.value||'';
+          const wsel=w.value||'';
+
+          let list=data;
+          if(activeCats.size) list=list.filter(x=>activeCats.has(x.category||''));
+          if(lsel) list=list.filter(x=>(x.location||'')===lsel);
+          if(wsel) list=list.filter(x=>String(x.warranty_status||'').toLowerCase()===wsel.toLowerCase());
+          if(text){
+            list=list.filter(x=>(`${x.title} ${x.brand} ${x.model} ${x.serial} ${x.asset_tag} ${x.location} ${x.room} ${x.dept}`.toLowerCase().includes(text)));
+          }
+          drawTable(sortList(list));
+        }
+        [q,loc,w].forEach(el=>el.addEventListener('input',run));
+        run();
+
+        // Sorting
+        document.querySelectorAll('th.sortable').forEach(th=>{
+          th.addEventListener('click', ()=>{
+            const k=th.dataset.k;
+            if(k===sortK){ sortDir = (sortDir==='asc'?'desc':'asc'); }
+            else { sortK=k; sortDir='asc'; }
+            run();
+          });
+        });
+
+      }catch(err){
+        console.error(err);
+        status.style.display='block';
+        status.textContent = 'Error: could not load inventory (tried function and data.json). Check your Netlify Function logs or ensure data.json exists.';
+      }
+    })();
+  </script>
+</body>
+</html>
