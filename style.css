@@ -239,3 +239,18 @@ th.sort-active .arrow{ opacity:1; }
 
 /* print: keep charts off the page */
 @media print{ .chart-card, canvas { display:none !important; } }
+
+/* --- Fix Chart.js "sliding" canvases --- */
+.mini-chart canvas{
+  width:100% !important;
+  height:160px !important;   /* steady height */
+  display:block;
+}
+
+/* --- Light blue button for Table page actions --- */
+.btn.blue{
+  background:#e0f2fe;
+  border-color:#bae6fd;
+  color:#075985;
+}
+.btn.blue:hover{ filter:brightness(.98); }
