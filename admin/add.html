@@ -116,5 +116,25 @@ f.addEventListener('submit', async (e)=>{
   if(res.ok) setTimeout(()=>location.href='../edit.html?slug='+encodeURIComponent(o.slug), 600);
 });
 </script>
+
+  <script>
+(function(){
+  const params = new URLSearchParams(location.search);
+  const cat = params.get('category');
+  if(!cat) return;
+  // try common ids/names for the Category field
+  const sel = document.querySelector('#category, select[name="category"], select[name="Category"]');
+  if(sel){
+    // normalize possible pluralization
+    const wanted = cat.toLowerCase();
+    [...sel.options].forEach(o=>{
+      if(o.text.toLowerCase()===wanted || o.value.toLowerCase()===wanted){
+        sel.value = o.value; sel.dispatchEvent(new Event('change'));
+      }
+    });
+  }
+})();
+</script>
+
 </body>
 </html>
