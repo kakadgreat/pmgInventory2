@@ -18,12 +18,9 @@
 <main class="container">
   <section class="pill">
     <h2>All Inventory</h2>
-
-    <!-- Count pills -->
     <div id="catChips" class="chips"></div>
 
-    <!-- Filters -->
-    <div class="row" style="gap:.5rem; flex-wrap:wrap; align-items:center">
+    <div class="row" style="gap:.5rem;flex-wrap:wrap;align-items:center">
       <input id="q" type="search" placeholder="Search by model, user, serial, room…" />
       <select id="loc"><option value="">All locations</option></select>
       <select id="w"><option value="">Any warranty</option><option>Active</option><option>Deactivated</option></select>
@@ -36,25 +33,18 @@
 </main>
 
 <script>
-async function load(){ try{ const r=await fetch('/.netlify/functions/inventory',{cache:'no-store'}); if(r.ok) return await r.json(); }catch{} return []; }
-async function cfg(){ try{ const r=await fetch('/.netlify/functions/config'); if(r.ok) return await r.json(); }catch{} return { locations:[] }; }
-function set(sel, arr, label){
-  sel.innerHTML = label?`<option value="">${label}</option>`:'';
-  [...new Set(arr.filter(Boolean))].sort().forEach(v=>sel.insertAdjacentHTML('beforeend', `<option>${v}</option>`));
-}
-function getParam(k){ return new URLSearchParams(location.search).get(k)||''; }
-function groupBy(xs,k){ return xs.reduce((a,x)=>((a[x[k]||'']=(a[x[k]||'']||[]).concat(x)),a),{}); }
+async function getJSON(u){const r=await fetch(u,{cache:'no-store'});if(!r.ok)throw new Error(r.status);return r.json();}
+async function load(){try{const d=await getJSON('/.netlify/functions/inventory');return Array.isArray(d)?d:(d.items||[]);}catch(e){try{const d=await getJSON('/data.json');return Array.isArray(d)?d:(d.items||[]);}catch{return[]}}}
+async function cfg(){try{return await getJSON('/.netlify/functions/config');}catch{return{locations:[]}}}
+function set(sel,arr,label){sel.innerHTML=label?`<option value="">${label}</option>`:'';[...new Set(arr.filter(Boolean))].sort().forEach(v=>sel.insertAdjacentHTML('beforeend',`<option>${v}</option>`));}
+function groupBy(xs,k){return xs.reduce((a,x)=>((a[x[k]||'']=(a[x[k]||'']||[]).concat(x)),a),{})}
+function getParam(k){return new URLSearchParams(location.search).get(k)||'';}
 function card(x){
-  const w=(x.warranty_status||'').toLowerCase();
-  const wBadge=w?`<span class="badge ${w==='active'?'ok':'bad'}">${x.warranty_status}</span>`:'';
+  const w=(x.warranty_status||'').toLowerCase(), b=w?`<span class="badge ${w==='active'?'ok':'bad'}">${x.warranty_status}</span>`:'';
   const tags=[x.category,x.brand,x.model].filter(Boolean).map(t=>`<span class="badge">${t}</span>`).join(' ');
-  return `
-  <div class="card">
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem">
-      <h3>${x.title||'-'}</h3>
-      <a class="btn" href="admin/edit.html?slug=${encodeURIComponent(x.slug||'')}">Edit</a>
-    </div>
-    <div class="row">${tags} ${wBadge}</div>
+  return `<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem">
+    <h3>${x.title||'-'}</h3><a class="btn" href="admin/edit.html?slug=${encodeURIComponent(x.slug||'')}">Edit</a></div>
+    <div class="row">${tags} ${b}</div>
     <div class="kv">
       <div class="marker">User</div><div>${x.user||'-'}</div>
       <div class="marker">Location</div><div>${x.location||'-'}</div>
@@ -62,56 +52,33 @@ function card(x){
       <div class="marker">Dept</div><div>${x.dept||'-'}</div>
       <div class="marker">Asset / Serial</div><div>${[x.asset_tag,x.serial].filter(Boolean).join(' / ')||'-'}</div>
       <div class="marker">Warranty Expires</div><div>${x.warranty_expires||'-'}</div>
-    </div>
-  </div>`;
+    </div></div>`;
 }
 
-(async ()=>{
+(async()=>{
   const [data, conf] = await Promise.all([load(), cfg()]);
-  const grid=document.getElementById('grid');
-  const q=document.getElementById('q');
-  const loc=document.getElementById('loc');
-  const w=document.getElementById('w');
+  const grid=document.getElementById('grid'); const q=document.getElementById('q'); const loc=document.getElementById('loc'); const w=document.getElementById('w');
   set(loc, conf.locations?.length?conf.locations:data.map(x=>x.location), 'All locations');
 
-  // Build category chips with counts
-  const byCat = groupBy(data,'category');
-  const chipHost = document.getElementById('catChips');
-  const selected = new Set();
-  const presetCat = (getParam('category')||'').trim();
-  if(presetCat) selected.add(presetCat);
+  // build chips
+  const byCat=groupBy(data,'category'); const chipHost=document.getElementById('catChips'); const selected=new Set();
+  chipHost.innerHTML = Object.keys(byCat).filter(Boolean).sort().map(k=>`<span class="chip" data-k="${k}">${k} (${byCat[k].length})</span>`).join('');
+  chipHost.addEventListener('click',e=>{const t=e.target.closest('[data-k]'); if(!t) return; const k=t.dataset.k; selected.has(k)?selected.delete(k):selected.add(k); t.classList.toggle('active',selected.has(k)); run();});
 
-  function drawChips(){
-    chipHost.innerHTML = Object.keys(byCat).filter(Boolean).sort().map(k=>{
-      const n=byCat[k].length, active=selected.has(k);
-      return `<span class="chip ${active?'active':''}" data-k="${k}">${k} (${n})</span>`;
-    }).join('');
-  }
-  drawChips();
-
-  chipHost.addEventListener('click', e=>{
-    const t=e.target.closest('[data-k]'); if(!t) return;
-    const k=t.dataset.k; selected.has(k)?selected.delete(k):selected.add(k);
-    t.classList.toggle('active', selected.has(k));
-    run();
-  });
+  // preset from query
+  const presetLoc=(getParam('location')||'').trim(); if(presetLoc) loc.value=presetLoc;
+  const presetCats=(getParam('categories')||'').split('|').filter(Boolean);
+  presetCats.forEach(c=>{selected.add(c); const el=chipHost.querySelector(`[data-k="${CSS.escape(c)}"]`); if(el) el.classList.add('active');});
 
   function run(){
-    const text=(q.value||'').toLowerCase();
-    const lsel=loc.value||'';
-    const wsel=w.value||'';
-
-    let list = data;
-    if(selected.size) list=list.filter(x=>selected.has(x.category||''));
+    const text=(q.value||'').toLowerCase(), lsel=loc.value||'', wsel=w.value||'';
+    let list=data;
+    if(selected.size) list=list.filter(x=>selected.has(x.category||'')); 
     if(lsel) list=list.filter(x=>(x.location||'')===lsel);
     if(wsel) list=list.filter(x=>String(x.warranty_status||'').toLowerCase()===wsel.toLowerCase());
-    if(text){
-      list=list.filter(x=>(`${x.title} ${x.brand} ${x.model} ${x.serial} ${x.asset_tag} ${x.location} ${x.room} ${x.dept} ${x.user}`.toLowerCase().includes(text)));
-    }
-
+    if(text) list=list.filter(x=>(`${x.title} ${x.brand} ${x.model} ${x.serial} ${x.asset_tag} ${x.location} ${x.room} ${x.dept} ${x.user}`.toLowerCase().includes(text)));
     grid.innerHTML = list.map(card).join('') || `<div class="small" style="padding:.5rem 0">No results.</div>`;
 
-    // Show applied filters
     document.getElementById('activeFilters').innerHTML = [
       selected.size?`<span class="chip active">Category: ${[...selected].join(', ')}</span>`:'',
       lsel?`<span class="chip active">Location: ${lsel}</span>`:'',
