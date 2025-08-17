@@ -6,14 +6,17 @@
 <link rel="stylesheet" href="style.css"/>
 <style>
   .note{padding:.6rem .8rem;border:1px solid #e5e7eb;border-radius:10px;background:#f9fafb;color:#374151}
-  .dim{color:#6b7280}
+  .chip.sm{padding:.2rem .55rem;font-size:.85rem}
+  .chips-scroll{display:flex;gap:.4rem;overflow:auto;padding-bottom:.25rem}
+  .chips-scroll::-webkit-scrollbar{height:6px}
+  .chips-scroll::-webkit-scrollbar-thumb{background:#e5e7eb;border-radius:999px}
 </style>
 </head>
 <body>
 <header id="topbar" class="topbar">
   <div class="topbar-inner">
-    <a class="btn" href="index.html">Home</a>
-    <h1 style="margin:0;font-size:1.05rem">Phone Directory</h1>
+    <!-- Intentionally no Home link so you can share this page -->
+    <span class="badge">Phone Directory</span>
   </div>
 </header>
 
@@ -21,10 +24,13 @@
   <section class="pill">
     <div class="row" style="gap:.5rem;flex-wrap:wrap;align-items:center">
       <input id="q" type="search" placeholder="Search name, extension, role, team, email, location…"/>
-      <select id="loc"><option value="">All locations</option></select>
-      <select id="team"><option value="">All teams</option></select>
-      <select id="status"><option value="">Any status</option><option>Active</option><option>Deactivated</option></select>
+      <select id="loc" style="max-width:220px"><option value="">All locations</option></select>
+      <select id="status" style="max-width:180px"><option value="">Any status</option><option>Active</option><option>Deactivated</option></select>
     </div>
+
+    <!-- Quick team slicers (multi-select pills) -->
+    <div id="teamChips" class="chips chips-scroll" style="margin-top:.5rem"></div>
+
     <div id="statusMsg" class="note" style="display:none;margin-top:.5rem"></div>
   </section>
 
@@ -32,27 +38,26 @@
 </main>
 
 <script>
-/* ---------------- helpers ---------------- */
+/* ------------ helpers ------------ */
 async function fetchJSON(url){
   const r = await fetch(url, {cache:'no-store'});
   if(!r.ok) throw new Error('HTTP '+r.status);
   return await r.json();
 }
+function distinct(arr){return [...new Set(arr.filter(Boolean))]}
 function setOptions(sel, arr, label){
   sel.innerHTML = label?`<option value="">${label}</option>`:'';
-  [...new Set(arr.filter(Boolean))].sort()
-    .forEach(v => sel.insertAdjacentHTML('beforeend', `<option>${v}</option>`));
+  distinct(arr).sort().forEach(v => sel.insertAdjacentHTML('beforeend', `<option>${v}</option>`));
 }
-function ucfirst(s){s=String(s||''); return s? s[0].toUpperCase()+s.slice(1): s;}
+function ucfirst(s){s=String(s||'');return s? s[0].toUpperCase()+s.slice(1):s;}
 function normStatus(v){
   if (v===true || String(v).toLowerCase()==='true') return 'Active';
   const s = String(v||'').toLowerCase();
   if (s==='active') return 'Active';
-  if (s==='inactive' || s==='deactivated' || s==='disabled') return 'Deactivated';
+  if (['inactive','deactivated','disabled'].includes(s)) return 'Deactivated';
   return ucfirst(v||'');
 }
 function normalizeRow(p){
-  // try many possible field names -> unified shape
   const name = p.name || p.full_name || p.displayName || p.user || '';
   const ext  = p.extension || p.ext || p.exten || p.ext_no || p.extention || '';
   const direct = p.direct || p.direct_line || p.directLine || '';
@@ -64,7 +69,6 @@ function normalizeRow(p){
 
   let team = p.team ?? p.teams ?? '';
   if (Array.isArray(team)) team = team.join(', ');
-  // also support pipe/semicolon separated strings
   if (typeof team === 'string') team = team.replace(/[|;]+/g, ', ').replace(/\s*,\s*/g, ', ').trim();
 
   return { name, extension: String(ext||'').trim(), direct, mobile, email, location, team, role, status };
@@ -92,16 +96,13 @@ function card(p){
 }
 function getParam(k){ return new URLSearchParams(location.search).get(k)||''; }
 
-/* -------------- robust loader -------------- */
+/* ---------- robust loader (phones.json first, then functions) ---------- */
 async function loadPhones(){
   const candidates = [
-    // your "quick" function likely lives at one of these
-    '/.netlify/functions/phone_quick',
-    '/.netlify/functions/phones_quick',
+    '/phones.json',                           // you confirmed this exists
+    '/.netlify/functions/phone_quick',        // your quick page likely uses this
     '/.netlify/functions/phones',
     '/.netlify/functions/phone',
-    // plain files
-    '/phones.json',
     '/data/phones.json'
   ];
   const tried = [];
@@ -114,50 +115,62 @@ async function loadPhones(){
       else if (Array.isArray(j.records)) rows = j.records;
       else if (Array.isArray(j.rows)) rows = j.rows;
       else if (Array.isArray(j.data)) rows = j.data;
-      else tried.push(`${u} (shape not recognized)`);
+      else { tried.push(`${u} (unrecognized shape)`); continue; }
 
       if (rows.length){
-        return {
-          items: rows.map(normalizeRow).filter(x=>x.name||x.extension||x.email),
-          source: u
-        };
+        return {items: rows.map(normalizeRow).filter(x=>x.name||x.extension||x.email), source:u, tried};
       }
       tried.push(`${u} (empty)`);
-    }catch(e){
-      tried.push(`${u} (error)`);
-    }
+    }catch(e){ tried.push(`${u} (error)`); }
   }
   return {items:[], source:null, tried};
 }
 
-/* -------------- main -------------- */
+/* ---------------- main ---------------- */
 (async()=>{
-  const {items, source, tried=[]} = await loadPhones();
+  const {items, source, tried} = await loadPhones();
 
-  const grid=document.getElementById('grid');
-  const q=document.getElementById('q'), loc=document.getElementById('loc'),
-        team=document.getElementById('team'), status=document.getElementById('status');
-  const statusMsg=document.getElementById('statusMsg');
+  const grid   = document.getElementById('grid');
+  const q      = document.getElementById('q');
+  const loc    = document.getElementById('loc');
+  const status = document.getElementById('status');
+  const teamChips = document.getElementById('teamChips');
+  const statusMsg = document.getElementById('statusMsg');
 
   if(!items.length){
     statusMsg.style.display='block';
-    statusMsg.innerHTML = `<strong>No phone data found.</strong>
-      <div class="dim" style="margin-top:.25rem">Tried: ${tried.join(' → ')}</div>`;
-  }else{
-    setOptions(loc, items.map(p=>p.location), 'All locations');
-    setOptions(team, items.flatMap(p=>(p.team||'').split(',').map(s=>s.trim())), 'All teams');
-    statusMsg.style.display='block';
-    statusMsg.textContent = `Loaded ${items.length} entries from ${source}.`;
+    statusMsg.innerHTML = `<strong>No phone data found.</strong><br/><span style="color:#6b7280">Tried: ${tried.join(' → ')}</span>`;
+    return;
   }
 
-  // preset search from ?q=
+  // Build filters
+  setOptions(loc, items.map(p=>p.location), 'All locations');
+
+  // Team chips: use your canonical list so it’s short & tidy
+  const TEAM_LIST = ["PROVIDERS","FRONT OFFICE","BILLING","ADMINISTRATION","MA","PEDIATRICS","SPA","CALL CENTER","IT","LEADERSHIP"];
+  const presentTeams = distinct(items.flatMap(p => (p.team||'').split(',').map(s=>s.trim()).filter(Boolean)));
+  const teams = TEAM_LIST.filter(t => presentTeams.includes(t)).concat(presentTeams.filter(t => !TEAM_LIST.includes(t)));
+  const selectedTeams = new Set();
+  teamChips.innerHTML = teams.map(t=>`<span class="chip sm" data-team="${t}">${t}</span>`).join('');
+  teamChips.addEventListener('click', e=>{
+    const c=e.target.closest('[data-team]'); if(!c) return;
+    const t=c.dataset.team;
+    if(selectedTeams.has(t)) selectedTeams.delete(t); else selectedTeams.add(t);
+    c.classList.toggle('active');
+    run();
+  });
+
+  // Show source
+  statusMsg.style.display='block';
+  statusMsg.textContent = `Loaded ${items.length} entries from ${source}.`;
+
+  // Pre-set search from ?q=
   const preset = (getParam('q')||'').trim();
   if(preset){ q.value=preset; }
 
   function run(){
     const text=(q.value||'').toLowerCase();
     const lsel=loc.value||'';
-    const tsel=team.value||'';
     const ssel=status.value||'';
     let list = items;
 
@@ -165,5 +178,19 @@ async function loadPhones(){
       list = list.filter(p => (`${p.name} ${p.extension} ${p.email} ${p.location} ${p.team} ${p.role}`.toLowerCase().includes(text)));
     }
     if(lsel) list = list.filter(p => (p.location||'')===lsel);
-    if(tsel) list = list.filter(p => (p.team||'').split(',').map(s=>s.trim()).includes(tsel));
-    if(ssel) list = list.filter(p => String(p.status||'').toLowerC
+    if(ssel) list = list.filter(p => String(p.status||'').toLowerCase()===ssel.toLowerCase());
+    if(selectedTeams.size){
+      list = list.filter(p => {
+        const pt = (p.team||'').split(',').map(s=>s.trim());
+        return [...selectedTeams].some(t => pt.includes(t));
+      });
+    }
+
+    grid.innerHTML = list.map(card).join('') || `<div class="small" style="padding:.5rem 0">No results.</div>`;
+  }
+  [q,loc,status].forEach(el=>el.addEventListener('input',run));
+  run();
+})();
+</script>
+</body>
+</html>
