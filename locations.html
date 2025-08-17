@@ -18,11 +18,14 @@
 <main class="container">
   <section class="pill">
     <h2 style="margin:0 0 .25rem 0">Filters</h2>
+    <div class="small" style="margin-bottom:.25rem">Select categories and locations (multi-select). Use search to narrow further.</div>
 
-    <!-- category chips -->
-    <div id="chips" class="chips"></div>
+    <!-- NEW: Location chips -->
+    <div id="locChips" class="chips" style="margin-bottom:.5rem"></div>
+    <!-- Category chips (existing) -->
+    <div id="catChips" class="chips"></div>
 
-    <div class="filters">
+    <div class="filters" style="margin-top:.25rem">
       <input id="q" type="search" placeholder="Search title / serial / user…" />
       <button class="btn print-hide" onclick="window.print()">Print</button>
     </div>
@@ -34,14 +37,14 @@
 <script>
 async function load(){ try{ const r=await fetch('/.netlify/functions/inventory',{cache:'no-store'}); if(r.ok) return await r.json(); }catch{} return []; }
 function groupBy(xs,k){ return xs.reduce((a,x)=>((a[x[k]||'']=(a[x[k]||'']||[]).concat(x)),a),{}); }
-function as(el,html){ el.innerHTML=html; }
-function chip(label,active){ return `<span class="chip ${active?'active':''}" data-cat="${label}">${label}</span>`; }
+function chip(label,active,count){ const c=(count!=null?` (${count})`:``); return `<span class="chip ${active?'active':''}" data-k="${label}">${label}${c}</span>`; }
 
-function renderCards(list, mountId){
-  const el=document.getElementById(mountId); if(!el) return; el.innerHTML='';
-  if(!Array.isArray(list)||!list.length){ el.insertAdjacentHTML('beforeend','<div class="small">No items found.</div>'); return; }
+function renderCards(list, mount){
+  const el=document.getElementById(mount); el.innerHTML='';
+  if(!list.length){ el.insertAdjacentHTML('beforeend','<div class="small">No items.</div>'); return; }
   list.forEach(x=>{
-    const w=(x.warranty_status||'').toLowerCase(); const wBadge=w?`<span class="badge ${w==='active'?'ok':'bad'}">${x.warranty_status}</span>`:'';
+    const w=(x.warranty_status||'').toLowerCase();
+    const wBadge=w?`<span class="badge ${w==='active'?'ok':'bad'}">${x.warranty_status}</span>`:'';
     const tags=[x.brand,x.model,x.os].filter(Boolean).map(t=>`<span class="badge">${t}</span>`).join(' ');
     el.insertAdjacentHTML('beforeend',`
       <div class="card">
@@ -62,39 +65,37 @@ function renderCards(list, mountId){
   });
 }
 
-(async () => {
+(async()=>{
   const data = await load();
+  const byLoc = groupBy(data,'location');
+  const locOrder = Object.keys(byLoc).filter(Boolean).sort();
   const byCat = groupBy(data,'category');
   const catOrder = Object.keys(byCat).filter(Boolean).sort();
-  const activeCats = new Set();
 
-  // build chips
-  const chipsHost=document.getElementById('chips');
-  chipsHost.innerHTML = catOrder.map(c=>chip(c,false)).join('');
-  chipsHost.addEventListener('click', (e)=>{
-    const t=e.target.closest('[data-cat]'); if(!t) return;
-    const name=t.dataset.cat;
-    activeCats.has(name) ? activeCats.delete(name) : activeCats.add(name);
-    chipsHost.querySelectorAll('[data-cat]').forEach(el=>el.classList.toggle('active', activeCats.has(el.dataset.cat)));
-    run();
-  });
+  const activeLoc=new Set(), activeCat=new Set();
+  const locChipsHost=document.getElementById('locChips');
+  const catChipsHost=document.getElementById('catChips');
+  const wrap=document.getElementById('locations');
+  const q=document.getElementById('q');
 
-  // render per-location groups
-  const wrap = document.getElementById('locations');
-  const q = document.getElementById('q');
+  function drawChips(){
+    locChipsHost.innerHTML = locOrder.map(k=>chip(k, activeLoc.has(k), (byLoc[k]||[]).length)).join('');
+    catChipsHost.innerHTML = catOrder.map(k=>chip(k, activeCat.has(k), (byCat[k]||[]).length)).join('');
+  }
+  drawChips();
 
   function run(){
     const text=(q.value||'').toLowerCase();
-    const locGroups = groupBy(data, 'location');
     wrap.innerHTML='';
-    Object.keys(locGroups).sort().forEach(loc=>{
-      let list = locGroups[loc];
-      if(activeCats.size) list = list.filter(x=>activeCats.has(x.category||''));
-      if(text){
-        list = list.filter(x => (`${x.title} ${x.brand} ${x.model} ${x.serial} ${x.user} ${x.dept} ${x.room}`.toLowerCase().includes(text)));
-      }
+    Object.keys(byLoc).sort().forEach(loc=>{
+      if(activeLoc.size && !activeLoc.has(loc)) return;
+      let list = byLoc[loc];
+
+      if(activeCat.size) list = list.filter(x=>activeCat.has(x.category||''));
+      if(text) list = list.filter(x => (`${x.title} ${x.brand} ${x.model} ${x.serial} ${x.user} ${x.dept} ${x.room}`.toLowerCase().includes(text)));
       if(!list.length) return;
-      const id = `loc-${loc.toLowerCase().replace(/[^\w]+/g,'-')}`;
+
+      const id=`loc-${loc.toLowerCase().replace(/[^\w]+/g,'-')}`;
       wrap.insertAdjacentHTML('beforeend', `
         <section class="pill">
           <h2>${loc || 'Unspecified'} <span class="small">(${list.length})</span></h2>
@@ -104,6 +105,19 @@ function renderCards(list, mountId){
       renderCards(list, id);
     });
   }
+
+  locChipsHost.addEventListener('click', e=>{
+    const t=e.target.closest('[data-k]'); if(!t) return;
+    const k=t.dataset.k; activeLoc.has(k)?activeLoc.delete(k):activeLoc.add(k);
+    t.classList.toggle('active', activeLoc.has(k));
+    run();
+  });
+  catChipsHost.addEventListener('click', e=>{
+    const t=e.target.closest('[data-k]'); if(!t) return;
+    const k=t.dataset.k; activeCat.has(k)?activeCat.delete(k):activeCat.add(k);
+    t.classList.toggle('active', activeCat.has(k));
+    run();
+  });
   q.addEventListener('input', run);
   run();
 })();
