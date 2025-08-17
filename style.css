@@ -212,5 +212,30 @@ th.sort-active .arrow{ opacity:1; }
 .chart-legend{ display:flex; flex-wrap:wrap; gap:.4rem .6rem; margin-top:.5rem; }
 .legend-dot{ width:.75rem; height:.75rem; border-radius:999px; display:inline-block; margin-right:.35rem; }
 
+/* Home overview layout (pills left, small charts right) */
+.overview-grid{
+  display:grid;
+  grid-template-columns: 1fr 280px;   /* pills area + slim chart rail */
+  gap:14px;
+  align-items:start;
+}
+.overview-side{ display:flex; flex-direction:column; gap:12px; }
+.mini-chart{
+  background:#fff; border:1px solid var(--line);
+  border-radius:12px; padding:10px 12px;
+}
+.mini-chart h3{ font-size:.9rem; margin:.25rem 0 .5rem 0; color:#111827; }
+.mini-chart canvas{ width:100%; height:auto; }
+
+/* Mobile: charts drop under the pills */
+@media (max-width:900px){
+  .overview-grid{ grid-template-columns: 1fr; }
+}
+
+/* Hide charts on print, keep page tidy */
+@media print{
+  .mini-chart, .mini-chart *{ display:none !important; }
+}
+
 /* print: keep charts off the page */
 @media print{ .chart-card, canvas { display:none !important; } }
