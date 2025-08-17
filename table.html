@@ -15,17 +15,20 @@
 </header>
 
 <main class="container screenfill">
+  <!-- Overview pills with counts (clickable / multi-select) -->
   <section class="pill">
-    <div class="row" style="justify-content:space-between; gap:.5rem; flex-wrap:wrap">
-      <div class="row">
-        <input id="q" type="search" placeholder="Search title, serial, brand, location…" />
-        <select id="cat"><option value="">All categories</option></select>
-        <select id="loc"><option value="">All locations</option></select>
-        <select id="w"><option value="">Any warranty</option><option>Active</option><option>Deactivated</option></select>
-      </div>
-      <div class="row">
-        <a class="btn" href="admin/add">+ Add</a>
-      </div>
+    <h2 style="margin:0 0 .25rem 0">Inventory Overview</h2>
+    <div id="catChips" class="chips"></div>
+
+    <div class="filters">
+      <input id="q" type="search" placeholder="Search title, serial, brand, location…" />
+      <select id="loc"><option value="">All locations</option></select>
+      <select id="w"><option value="">Any warranty</option><option>Active</option><option>Deactivated</option></select>
+    </div>
+
+    <div class="row">
+      <a class="btn" href="admin/add">+ Add</a>
+      <button class="btn print-hide" onclick="window.print()">Print</button>
     </div>
   </section>
 
@@ -42,7 +45,7 @@
           <th class="sortable" data-k="dept">Dept <span class="arrow">↕</span></th>
           <th class="sortable" data-k="warranty_status">Warranty status <span class="arrow">↕</span></th>
           <th class="sortable" data-k="warranty_expires">Warranty expires <span class="arrow">↕</span></th>
-          <th>Actions</th>
+          <th class="col-actions">Actions</th>
         </tr>
       </thead>
       <tbody id="tb"></tbody>
@@ -52,11 +55,13 @@
 
 <script>
 const FALLBACK_LOCATIONS=["Jasper Primary Care","Jasper Pediatrics","Jasper MedSpa","Roswell Primary Care","Roswell MedSpa","Canton Primary Care","Canton Pediatrics","Canton MedSpa","Rome Primary Care","Rome MedSpa"];
-async function cfg(){ try{ const r=await fetch('/.netlify/functions/config'); if(r.ok) return await r.json(); }catch{} return { categories:["Desktops","Laptops","Phones","Printers","Scanners","Other"], locations:FALLBACK_LOCATIONS }; }
+async function cfg(){ try{ const r=await fetch('/.netlify/functions/config'); if(r.ok) return await r.json(); }catch{} return { categories:["Desktops","Laptops","Phones","Other"], locations:FALLBACK_LOCATIONS }; }
 async function load(){ try{ const r=await fetch('/.netlify/functions/inventory',{cache:'no-store'}); if(r.ok) return await r.json(); }catch{} return []; }
 function set(sel, arr, label){ sel.innerHTML=label?`<option value="">${label}</option>`:''; [...new Set(arr.filter(Boolean))].sort().forEach(v=>sel.insertAdjacentHTML('beforeend', `<option>${v}</option>`)); }
+function groupBy(xs,k){ return xs.reduce((a,x)=>((a[x[k]||'']=(a[x[k]||'']||[]).concat(x)),a),{}); }
 
 let data=[], sortK='title', sortDir='asc';
+const activeCats=new Set();
 
 function compare(a,b,k){
   const av=(a[k]??'').toString().toLowerCase();
@@ -67,10 +72,11 @@ function sortData(list){
   const s=[...list].sort((a,b)=>compare(a,b,sortK));
   return sortDir==='asc'?s:s.reverse();
 }
+function chip(label,count,active){ return `<span class="chip ${active?'active':''}" data-cat="${label}">${label} (${count})</span>`; }
 
-function draw(list){
+function drawTable(list){
   const tb=document.getElementById('tb');
-  const rows = list.map(x=>`
+  tb.innerHTML = list.map(x=>`
     <tr>
       <td>${x.category||'-'}</td>
       <td>${x.brand||'-'}</td>
@@ -81,10 +87,9 @@ function draw(list){
       <td>${x.dept||'-'}</td>
       <td>${x.warranty_status||'-'}</td>
       <td>${x.warranty_expires||'-'}</td>
-      <td><a class="btn sm" href="admin/edit.html?slug=${encodeURIComponent(x.slug||'')}">Edit</a></td>
+      <td class="col-actions"><a class="btn sm" href="admin/edit.html?slug=${encodeURIComponent(x.slug||'')}">Edit</a></td>
     </tr>
-  `).join('');
-  tb.innerHTML = rows || `<tr><td colspan="10" class="small">No results.</td></tr>`;
+  `).join('') || `<tr><td colspan="10" class="small">No results.</td></tr>`;
 
   // header highlight + arrows
   document.querySelectorAll('th.sortable').forEach(th=>{
@@ -97,20 +102,39 @@ function draw(list){
 (async () => {
   const [d, c] = await Promise.all([load(), cfg()]);
   data = d;
-  const q=document.getElementById('q'), cat=document.getElementById('cat'), loc=document.getElementById('loc'), w=document.getElementById('w');
-  set(cat, (c.categories||[]).length?c.categories:["Desktops","Laptops","Phones","Other"], 'All categories');
+
+  // build overview chips with counts
+  const byCat = groupBy(data,'category');
+  const catOrder = (c.categories?.length?c.categories:Object.keys(byCat));
+  const chipsHost = document.getElementById('catChips');
+  chipsHost.innerHTML = catOrder.map(cat => chip(cat, (byCat[cat]||[]).length, false)).join('');
+  chipsHost.addEventListener('click', (e)=>{
+    const t=e.target.closest('[data-cat]'); if(!t) return;
+    const name=t.dataset.cat;
+    if(activeCats.has(name)) activeCats.delete(name); else activeCats.add(name);
+    // toggle UI
+    chipsHost.querySelectorAll('[data-cat]').forEach(el=>{
+      el.classList.toggle('active', activeCats.has(el.dataset.cat));
+    });
+    run();
+  });
+
+  // filters
+  const q=document.getElementById('q'), loc=document.getElementById('loc'), w=document.getElementById('w');
   set(loc, (c.locations||[]).length?c.locations:FALLBACK_LOCATIONS, 'All locations');
 
   function run(){
-    const text=(q.value||'').toLowerCase(), csel=cat.value||'', lsel=loc.value||'', wsel=w.value||'';
+    const text=(q.value||'').toLowerCase(), lsel=loc.value||'', wsel=w.value||'';
     let list=data;
-    if(csel) list=list.filter(x=>String(x.category||'').toLowerCase()===csel.toLowerCase());
+
+    if(activeCats.size) list=list.filter(x=>activeCats.has(x.category||''));
     if(lsel) list=list.filter(x=>(x.location||'')===lsel);
     if(wsel) list=list.filter(x=>String(x.warranty_status||'').toLowerCase()===wsel.toLowerCase());
     if(text) list=list.filter(x=>(`${x.title} ${x.brand} ${x.model} ${x.serial} ${x.asset_tag} ${x.location} ${x.room} ${x.dept}`.toLowerCase().includes(text)));
-    draw(sortData(list));
+
+    drawTable(sortData(list));
   }
-  [q,cat,loc,w].forEach(el=>el.addEventListener('input',run));
+  [q,loc,w].forEach(el=>el.addEventListener('input',run));
   run();
 
   // header click sorting
