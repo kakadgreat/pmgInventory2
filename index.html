@@ -151,4 +151,114 @@ function bar(ctx,labels,data){return new Chart(ctx,{type:'bar',data:{labels,data
   else { health.textContent='Data error'; health.className='badge fn-error'; }
 
   const data = items;
-  const cats = cfg.categories?.length?cfg.categories:[...new Set(data.map(x=>x.category).fi]()
+  const cats = cfg.categories?.length?cfg.categories:[...new Set(data.map(x=>x.category).filter(Boolean))];
+  const locs = cfg.locations?.length?cfg.locations:FALLBACK_LOC;
+
+  /* Quick phone search */
+  document.getElementById('phoneGo').onclick = () => {
+    const q=document.getElementById('phoneQ').value.trim();
+    location.href = 'phone.html?q='+encodeURIComponent(q);
+  };
+
+  /* ----- Stat cards ----- */
+  function renderStats(){
+    const g=document.getElementById('stats'); g.innerHTML='';
+    const byCat=by(data,'category'); const active=by(data,x=>(String(x.warranty_status||'').toLowerCase()==='active'?'Active':'Other'));
+    const soon=data.filter(x=>{const d=parseDate(x.warranty_expires); return d && daysUntil(d)<=90;}).length;
+    const total=data.length, act=(active.get('Active')||0), deact=total-act;
+
+    const make=(title,val,sub='')=>`<div class="stat"><h4>${title}</h4><div class="big">${val}</div><div class="small">${sub}</div></div>`;
+    g.insertAdjacentHTML('beforeend', make('Total Items', total, `${cats.map(c=>`${c}: ${byCat.get(c)||0}`).join(' · ')}`));
+    g.insertAdjacentHTML('beforeend', make('Active', act, `Deactivated: ${deact}`));
+    g.insertAdjacentHTML('beforeend', make('Expiring ≤ 90 days', soon, 'See list below'));
+    const phoneCount = (byCat.get('Phones')||byCat.get('Phone')||0);
+    g.insertAdjacentHTML('beforeend', make('Phones', phoneCount, 'Quick search above'));
+  }
+  renderStats();
+
+  /* ----- Overview pills + pies ----- */
+  const catCounts = by(data,'category');
+  const catPills=document.getElementById('catPills');
+  catPills.innerHTML = cats.map(k=>`<a class="chip" href="list.html?categories=${encodeURIComponent(k)}">${k} (${catCounts.get(k)||0})</a>`).join('');
+  pie(document.getElementById('catChart').getContext('2d'), cats, cats.map(c=>catCounts.get(c)||0));
+
+  const wCounts = by(data, x => {const s=String(x.warranty_status||'').toLowerCase();return (s==='active'?'Active':(s==='deactivated'?'Deactivated':'Unknown'));});
+  const wLabels=['Active','Deactivated','Unknown'].filter(k=>wCounts.has(k));
+  pie(document.getElementById('warChart').getContext('2d'), wLabels, wLabels.map(k=>wCounts.get(k)||0));
+
+  /* ----- Expiring soon ----- */
+  const expTbl=document.querySelector('#expTbl tbody');
+  function drawExp(days=60){
+    const list=data.filter(x=>{const d=parseDate(x.warranty_expires); return d && daysUntil(d)<=days;})
+                   .sort((a,b)=>parseDate(a.warranty_expires)-parseDate(b.warranty_expires))
+                   .slice(0,25);
+    expTbl.innerHTML = list.map(x=>`
+      <tr>
+        <td>${x.title||'-'}</td>
+        <td>${x.category||'-'}</td>
+        <td>${x.location||'-'}</td>
+        <td>${x.warranty_expires||'-'}</td>
+        <td><a class="btn sm" href="admin/edit.html?slug=${encodeURIComponent(x.slug||'')}">Edit</a></td>
+      </tr>
+    `).join('') || `<tr><td colspan="5" class="small">Nothing expiring in this window.</td></tr>`;
+  }
+  drawExp(60);
+  document.getElementById('expWin').onchange=e=>drawExp(parseInt(e.target.value,10));
+
+  /* ----- Location heatmap ----- */
+  const byLoc=by(data,'location'); const locLabels=locs.filter(Boolean);
+  const locValues=locLabels.map(l=>byLoc.get(l)||0);
+  const lc=bar(document.getElementById('locChart').getContext('2d'), locLabels, locValues);
+  // click => go to list filtered by location
+  document.getElementById('locChart').onclick = (evt)=>{
+    const p=lc.getElementsAtEventForMode(evt,'nearest',{intersect:true},true)[0]; if(!p) return;
+    const label=lc.data.labels[p.index];
+    location.href='list.html?location='+encodeURIComponent(label);
+  };
+
+  /* ----- Saved views ----- */
+  const viewLoc=document.getElementById('viewLoc'), viewCats=document.getElementById('viewCats'), viewsHost=document.getElementById('views');
+  locs.forEach(l=>viewLoc.insertAdjacentHTML('beforeend', `<option>${l}</option>`));
+  cats.forEach(c=>viewCats.insertAdjacentHTML('beforeend', `<option>${c}</option>`));
+  const loadViews=()=>JSON.parse(localStorage.getItem('pmg_views')||'[]');
+  const saveViews=v=>localStorage.setItem('pmg_views',JSON.stringify(v));
+  function renderViews(){
+    const vs=loadViews();
+    viewsHost.innerHTML = vs.map(v=>{
+      const qs=[]; if(v.location) qs.push('location='+encodeURIComponent(v.location));
+      if(v.categories?.length) qs.push('categories='+encodeURIComponent(v.categories.join('|')));
+      return `<a class="view-chip" href="list.html?${qs.join('&')}">${v.name}</a>`;
+    }).join('') || `<span class="small">No saved views yet.</span>`;
+  }
+  renderViews();
+  document.getElementById('saveView').onclick = ()=>{
+    const name=document.getElementById('viewName').value.trim(); if(!name) return alert('Give the view a name.');
+    const loc=viewLoc.value||'';
+    const catsSel=[...viewCats.selectedOptions].map(o=>o.value);
+    const vs=loadViews(); vs.push({name,location:loc,categories:catsSel}); saveViews(vs); renderViews();
+    document.getElementById('viewName').value='';
+  };
+
+  /* ----- Export CSV (all items) ----- */
+  document.getElementById('btnCSV').onclick = ()=>{
+    const csv=toCSV(data); const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='inventory-export.csv'; a.click(); URL.revokeObjectURL(a.href);
+  };
+
+  /* ----- QR labels (all items; first 48) ----- */
+  const qrOverlay=document.getElementById('qrOverlay'), qrGrid=document.getElementById('qrGrid');
+  document.getElementById('btnQR').onclick=()=>{
+    qrGrid.innerHTML='';
+    data.slice(0,48).forEach(item=>{
+      const id='qr-'+(item.slug||crypto.randomUUID());
+      const link=location.origin+'/admin/edit.html?slug='+(encodeURIComponent(item.slug||''));
+      qrGrid.insertAdjacentHTML('beforeend', `<div class="qr-label"><div id="${id}"></div><div class="meta">${item.title||'-'}<br><span>${item.serial||''}</span></div></div>`);
+      new QRCode(document.getElementById(id),{text:link,width:140,height:140,correctLevel:QRCode.CorrectLevel.M});
+    });
+    qrOverlay.style.display='block';
+  };
+  document.getElementById('qrClose').onclick=()=>{qrOverlay.style.display='none';};
+})();
+</script>
+</body>
+</html>
