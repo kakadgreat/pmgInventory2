@@ -152,3 +152,43 @@ th.sort-active{ background:#ecfdf5 !important; color:#065f46; border-bottom-colo
 th .arrow{ opacity:.45; margin-left:.25rem; }
 th.sort-active .arrow{ opacity:1; }
 
+/* ---- Admin polish ---- */
+.zone textarea{ width:100%; }
+.btn.sm{ padding:.3rem .55rem; font-size:.85rem; }
+
+/* Keep sticky action buttons at right */
+.sticky-actions .right { display:flex; gap:.5rem; justify-content:flex-end; }
+
+/* Table sorting visuals */
+th.sortable{ cursor:pointer; user-select:none; }
+th.sort-active{ background:#ecfdf5 !important; color:#065f46; border-bottom-color:#10b981 !important; }
+th .arrow{ opacity:.45; margin-left:.25rem; }
+th.sort-active .arrow{ opacity:1; }
+
+/* Chips / pills (already used elsewhere, repeated here for clarity) */
+.chips{ display:flex; gap:.5rem; flex-wrap:wrap; margin:.5rem 0; }
+.chip{
+  border:1px solid var(--line); background:#fff; color:var(--text);
+  padding:.35rem .65rem; border-radius:999px; cursor:pointer; user-select:none;
+}
+.chip.active{ background:#ecfdf5; border-color:#10b981; color:#065f46; }
+
+/* ---- Print: Table & Locations ---- */
+@media print{
+  @page{ size: letter; margin: 0.5in; }
+
+  /* Hide interactive UI on print */
+  .topbar, .filters, .chips, .btn, .print-hide { display:none !important; }
+  .col-actions { display:none !important; }
+
+  /* Ensure table headers repeat per page */
+  table thead{ display: table-header-group; }
+  table tfoot{ display: table-footer-group; }
+
+  /* Borders for table on print */
+  .table{ border:1px solid #ddd; border-collapse: collapse; }
+  .table th, .table td{ border:1px solid #e5e7eb !important; }
+
+  /* Make sections tight */
+  .pill{ border:0; padding:0; margin:0 0 .25in 0; }
+}
