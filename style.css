@@ -254,3 +254,51 @@ th.sort-active .arrow{ opacity:1; }
   color:#075985;
 }
 .btn.blue:hover{ filter:brightness(.98); }
+
+
+/* ---------- Home: small chart rail & stat cards ---------- */
+.overview-grid{display:grid;grid-template-columns:1fr 280px;gap:14px;align-items:start}
+.overview-side{display:flex;flex-direction:column;gap:12px}
+.mini-chart{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.mini-chart h3{font-size:.9rem;margin:.25rem 0 .5rem 0;color:#111827}
+.mini-chart canvas{width:100%!important;height:160px!important;display:block}
+
+/* Stat cards */
+.stat-grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:12px}
+.stat{grid-column:span 3/span 3;background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px}
+.stat h4{margin:0 0 .25rem 0;font-size:.95rem;color:#111827}
+.stat .big{font-size:1.6rem;font-weight:700}
+@media(max-width:900px){.overview-grid{grid-template-columns:1fr}.stat{grid-column:span 6/span 6}}
+@media(max-width:640px){.stat{grid-column:span 12/span 12}}
+
+/* Saved views */
+.view-chip{border:1px dashed #cbd5e1;border-radius:999px;padding:.3rem .6rem;background:#f8fafc;cursor:pointer}
+.view-chip:hover{background:#eef2ff}
+
+/* Health badge */
+.badge.fn-ok{background:#ecfdf5;color:#065f46;border:1px solid #10b981}
+.badge.fn-fallback{background:#fff7ed;color:#9a3412;border:1px solid #fdba74}
+.badge.fn-error{background:#fef2f2;color:#991b1b;border:1px solid #fecaca}
+
+/* Expiring Soon list */
+.exp-table{width:100%;border-collapse:collapse}
+.exp-table th,.exp-table td{border-bottom:1px solid #e5e7eb;padding:.45rem .5rem;font-size:.95rem}
+.exp-table th{color:#374151;text-align:left;background:#fafafa}
+
+/* Heatmap */
+.chart-card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px}
+
+/* QR sheet */
+.qr-overlay{position:fixed;inset:0;background:#fff;z-index:1000;overflow:auto;padding:12px}
+.qr-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.qr-label{border:1px solid #e5e7eb;border-radius:10px;padding:12px;text-align:center}
+.qr-label .meta{font-size:.8rem;color:#374151;margin-top:.35rem}
+.qr-controls{display:flex;gap:.5rem;justify-content:flex-end;margin-bottom:10px}
+@media print{
+  .topbar,.no-print{display:none!important}
+  .qr-overlay{position:static;padding:0}
+}
+
+/* Light-blue buttons (shared) */
+.btn.blue{background:#e0f2fe;border-color:#bae6fd;color:#075985}
+.btn.blue:hover{filter:brightness(.98)}
