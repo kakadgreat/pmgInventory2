@@ -1,0 +1,3 @@
+import React from 'react'
+import Card from '../ui/Card.jsx'
+export default function Facilities({ data }){ if(!data) return <div>Loading...</div>; const cats=(data.facilities?.categories)||[]; return (<div className='grid md:grid-cols-2 gap-4'>{cats.map((c,i)=>(<Card key={i} title={c.category}><div className='space-y-2'>{c.vendors.map((v,idx)=>(<div key={idx} className='border rounded-xl p-2'><div className='font-semibold'>{v.name}</div>{v.phone&&<div><b>Phone:</b> {v.phone}</div>}{v.email&&<div><b>Email:</b> <a className='underline' href={`mailto:${v.email}`}>{v.email}</a></div>}{v.notes&&<div className='text-gray-600 text-sm'>{v.notes}</div>}</div>))}</div></Card>))}</div>) }

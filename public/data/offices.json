@@ -1,0 +1,64 @@
+{
+  "locations": [
+    {
+      "name": "Jasper Primary Care",
+      "url": "https://www.prestigemedicalgroup.org/location/prestige-medical-group-9",
+      "address": "51 Gordon Rd, Jasper, GA 30143",
+      "county": "Pickens"
+    },
+    {
+      "name": "Prestige Pediatrics in Jasper",
+      "url": "https://www.prestigepediatrics.org",
+      "address": "53 Gordon Rd, Suite 101, Jasper, GA 30143",
+      "county": "Pickens"
+    },
+    {
+      "name": "Jasper MedSpa",
+      "url": "https://www.prestigemedspa.org/location/jasper",
+      "address": "51 Gordon Rd, Jasper, GA 30143",
+      "county": "Pickens"
+    },
+    {
+      "name": "Canton Primary Care",
+      "url": "https://www.prestigemedicalgroup.org/location/prestige-medical-group-6",
+      "address": "3755 Sixes Rd, Suite 300, Canton, GA 30114",
+      "county": "Cherokee"
+    },
+    {
+      "name": "Prestige Pediatrics in Canton",
+      "url": "https://www.prestigemedicalgroup.org/location/prestige-pediatrics-in-canton",
+      "address": "3755 Sixes Rd, Suite 101, Canton, GA 30114",
+      "county": "Cherokee"
+    },
+    {
+      "name": "Canton MedSpa (Sixes)",
+      "url": "https://www.prestigemedspa.org/location/canton",
+      "address": "3755 Sixes Rd, Suite 303, Canton, GA 30114",
+      "county": "Cherokee"
+    },
+    {
+      "name": "Roswell Primary Care",
+      "url": "https://www.prestigemedicalgroup.org/location/prestige-medical-group-8",
+      "address": "12020 Etris Rd, Suite B110, Roswell, GA 30075",
+      "county": "Fulton"
+    },
+    {
+      "name": "Roswell MedSpa",
+      "url": "https://www.prestigemedspa.org/location/roswell",
+      "address": "12020 Etris Rd, Suite B110-B, Roswell, GA 30075",
+      "county": "Fulton"
+    },
+    {
+      "name": "Rome Primary Care",
+      "url": "https://www.prestigemedicalgroup.org/location/prestige-medical-group-7",
+      "address": "415 E 2nd Ave, Suite A, Rome, GA 30161",
+      "county": "Floyd"
+    },
+    {
+      "name": "Rome MedSpa",
+      "url": "https://www.prestigemedspa.org/location/rome",
+      "address": "415 E 2nd Ave, Suite A, Rome, GA 30161",
+      "county": "Floyd"
+    }
+  ]
+}

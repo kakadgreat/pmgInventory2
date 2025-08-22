@@ -1,0 +1,178 @@
+{
+  "categories": [
+    {
+      "category": "HVAC",
+      "vendors": [
+        {
+          "name": "HVAC (Atlanta)",
+          "phone": "404.509.9824",
+          "email": "",
+          "notes": ""
+        },
+        {
+          "name": "Sam Colon \u2013 The Heating and Air Company",
+          "phone": "678.500.6925",
+          "email": "",
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "category": "Plumbing",
+      "vendors": [
+        {
+          "name": "Plumber \u2013 Chris Amos - ; only responds via text. 3 \u2013 4-day response time. Responds to Ankur Yadav same day.",
+          "phone": "770.845.4664",
+          "email": "",
+          "notes": ""
+        },
+        {
+          "name": "Basement Washer/Dryer - under warranty by Geek Squad (Best Buy).",
+          "phone": "",
+          "email": "",
+          "notes": ""
+        },
+        {
+          "name": "Account Name: Dr. Anil Yadav",
+          "phone": "",
+          "email": "",
+          "notes": ""
+        },
+        {
+          "name": "Account Phone Number:",
+          "phone": "770.500.8873",
+          "email": "",
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "category": "Fire/Alarm",
+      "vendors": [
+        {
+          "name": "Fire. These are 2 different inspections handled by 2 different departments within Alliance Fire.",
+          "phone": "",
+          "email": "",
+          "notes": ""
+        },
+        {
+          "name": "Canton",
+          "phone": "",
+          "email": "",
+          "notes": ""
+        },
+        {
+          "name": "Alliance Fire",
+          "phone": "",
+          "email": "",
+          "notes": ""
+        },
+        {
+          "name": "Heather Micho, Inspections Coordinator",
+          "phone": "678.680.5742",
+          "email": "",
+          "notes": ""
+        },
+        {
+          "name": "New Billing Address: 6100 GA Hwy 20, Loganville, GA 30052",
+          "phone": "",
+          "email": "",
+          "notes": ""
+        },
+        {
+          "name": "Tori Taylor, Fire Alarm Coordinator",
+          "phone": "770.554.5004",
+          "email": "",
+          "notes": ""
+        },
+        {
+          "name": "folder on OneDrive",
+          "phone": "",
+          "email": "",
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "category": "Contractors/Handyman",
+      "vendors": [
+        {
+          "name": "contractor who completed the lower level and renovated Suite 202/203 is Korey Henkle who can be reached on , . He responds quickly to text.",
+          "phone": "770.899.8902",
+          "email": "",
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "category": "Printers/Copiers",
+      "vendors": [
+        {
+          "name": "printer is located on the 3rd floor in the MA station outside of Dr. Yadav\u2019s office. The printer's name is AFPMG105P.",
+          "phone": "",
+          "email": "",
+          "notes": ""
+        },
+        {
+          "name": "There is also a printer located on the 2nd floor at the check-in desk. The printer name is AFPMG11P.",
+          "phone": "",
+          "email": "",
+          "notes": ""
+        },
+        {
+          "name": "Jasper Office:",
+          "phone": "",
+          "email": "",
+          "notes": ""
+        },
+        {
+          "name": "Trina Chastain, Laura Hughes or Leslie Roper can assist with printing if needed.",
+          "phone": "",
+          "email": "",
+          "notes": ""
+        },
+        {
+          "name": "Facilities, IT & Service Request Form",
+          "phone": "",
+          "email": "",
+          "notes": ""
+        },
+        {
+          "name": "Platform:",
+          "phone": "",
+          "email": "",
+          "notes": ""
+        },
+        {
+          "name": "Shortened URL:",
+          "phone": "",
+          "email": "",
+          "notes": ""
+        },
+        {
+          "name": "Employees submit requests by visiting .  Ankur Yadav, IT Manager, can edit the form. Other form collaborators can be added by clicking on the 3 dots, choosing \u201ccollaborate or duplicate\u201d and adding the name.",
+          "phone": "",
+          "email": "",
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "category": "Pest Control",
+      "vendors": [
+        {
+          "name": "Pest Control is handled by Northwest Exterminating - .",
+          "phone": "(678) 383-1030",
+          "email": "",
+          "notes": ""
+        },
+        {
+          "name": "Denson Heating and Air (HVAC)",
+          "phone": "706.704.1900",
+          "email": "",
+          "notes": ""
+        }
+      ]
+    }
+  ]
+}

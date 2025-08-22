@@ -1,0 +1,1 @@
+export default function Card({ title, children }){return (<div className='bg-white rounded-2xl shadow-sm border p-4'><div className='text-sm font-semibold mb-2'>{title}</div><div className='text-sm'>{children}</div></div>)}
